@@ -202,167 +202,126 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
       ),
       body: Column(
         children: [
-          // Estado de la alerta con indicador de progreso
+          // Información compacta de la alerta - REDUCIDA
           Container(
-            padding: EdgeInsets.all(20),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               children: [
+                // Indicador de progreso más compacto
                 StepProgressIndicator(
                   totalSteps: 4,
                   currentStep: obtenerPasoEstado(_alertaActual.status),
                   selectedColor: Colors.green,
                   unselectedColor: Colors.grey[300]!,
+                  size: 6,
                 ),
-                SizedBox(height: 20),
+                SizedBox(height: 12),
+
+                // Card compacta con información esencial
                 Card(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Estado actual
                         Row(
                           children: [
                             Icon(
                               _getIconoEstado(_alertaActual.status),
                               color: _getColorEstado(_alertaActual.status),
-                              size: 24,
+                              size: 20,
                             ),
-                            SizedBox(width: 8),
-                            Text(
-                              obtenerTextoEstado(_alertaActual.status),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: _getColorEstado(_alertaActual.status),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                obtenerTextoEstado(_alertaActual.status),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: _getColorEstado(_alertaActual.status),
+                                ),
+                              ),
+                            ),
+                            if (_alertaActual.rutaAtencion != null) ...[
+                              Icon(
+                                Icons.route,
+                                size: 14,
+                                color: Colors.blue[600],
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                '${_calcularDistancia().toStringAsFixed(1)} km',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        SizedBox(height: 6),
+
+                        // Detalle de la alerta
+                        Text(
+                          _alertaActual.detalle,
+                          style: TextStyle(fontSize: 13),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6),
+
+                        // Ubicación compacta
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: Colors.blue[700],
+                              size: 14,
+                            ),
+                            SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _alertaActual.direccion,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue[700],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Detalle: ${_alertaActual.detalle}',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        SizedBox(height: 8),
 
-                        // Información de ubicación detallada
-                        Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue[200]!),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    color: Colors.blue[700],
-                                    size: 16,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Ubicación del Incidente:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue[700],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 4),
-                              _buildDireccionDetallada(),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Creada: ${_alertaActual.fechaHora.toLocal().toString().split('.')[0]}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        if (_alertaActual.atendidoPor != null)
-                          _buildInfoPolicia(),
-
-                        // Información de distancia y tiempo si hay policía asignado
-                        if (_alertaActual.rutaAtencion != null) ...[
-                          SizedBox(height: 12),
-                          Divider(),
-                          SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.route,
-                                    size: 16,
-                                    color: Colors.blue[600],
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Distancia: ${_calcularDistancia().toStringAsFixed(2)} km',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue[700],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (_tiempoEstimado > 0)
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.access_time,
-                                      size: 16,
-                                      color: Colors.blue[600],
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'ETA: ${_tiempoEstimado.toStringAsFixed(0)} min',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.blue[600],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                          if (_cargandoRuta)
-                            Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Calculando ruta por calles...',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                        if (_alertaActual.atendidoPor != null) ...[
+                          SizedBox(height: 4),
+                          _buildInfoPoliciaCompacta(),
                         ],
-                        // Dirección detallada
-                        SizedBox(height: 8),
-                        _buildDireccionDetallada(),
+
+                        if (_cargandoRuta) ...[
+                          SizedBox(height: 4),
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Calculando ruta...',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -370,8 +329,10 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
               ],
             ),
           ),
-          // Mapa
+
+          // Mapa - AHORA OCUPA MÁS ESPACIO
           Expanded(
+            flex: 4, // Dar más peso al mapa
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
@@ -1083,5 +1044,36 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
     } catch (e) {
       print('Error obteniendo información del policía: $e');
     }
+  }
+
+  Widget _buildInfoPoliciaCompacta() {
+    if (_infoPoliciaAsignado == null) return SizedBox();
+
+    return Row(
+      children: [
+        Icon(Icons.local_police, color: Colors.green[700], size: 14),
+        SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            'Policía: ${_infoPoliciaAsignado!['fullName'] ?? 'No disponible'}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.green[700],
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (_tiempoEstimado > 0) ...[
+          Icon(Icons.access_time, size: 12, color: Colors.blue[600]),
+          SizedBox(width: 2),
+          Text(
+            '${_tiempoEstimado.toStringAsFixed(0)}min',
+            style: TextStyle(fontSize: 11, color: Colors.blue[600]),
+          ),
+        ],
+      ],
+    );
   }
 }

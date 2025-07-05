@@ -82,6 +82,23 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
     }
   }
 
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pendiente':
+        return Colors.orange;
+      case 'asignado':
+        return Colors.blue;
+      case 'en camino':
+        return Colors.green;
+      case 'atendida':
+        return Colors.grey;
+      case 'cancelada':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,75 +120,149 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
             itemBuilder: (context, index) {
               final alerta = alertas[index];
               return Card(
-                margin: EdgeInsets.all(12),
+                margin: EdgeInsets.all(8),
                 child: Column(
                   children: [
-                    ListTile(
-                      title: Text(
-                        alerta.detalle,
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Column(
+                    // Información compacta de la alerta
+                    Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Estado: ${alerta.status}'),
-                          Text('Usuario: ${alerta.usuarioCreador}'),
-                          Text(
-                            'Fecha: ${alerta.fechaHora.toString().substring(0, 16)}',
+                          // Título y estado en una fila
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  alerta.detalle,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(alerta.status),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  alerta.status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            'Ubicación: ${alerta.direccionCompleta}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.blue[700],
-                              fontWeight: FontWeight.w500,
-                            ),
+                          SizedBox(height: 6),
+
+                          // Información básica en filas compactas
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Usuario: ${alerta.usuarioCreador}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              Spacer(),
+                              Icon(
+                                Icons.access_time,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                alerta.fechaHora.toString().substring(5, 16),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 4),
+
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.blue[700],
+                              ),
+                              SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  alerta.direccion,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.blue[700],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.directions,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => RutaAtencionScreen(
+                                            alerta: alerta,
+                                          ),
+                                    ),
+                                  );
+                                },
+                                padding: EdgeInsets.zero,
+                                constraints: BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      trailing: IconButton(
-                        icon: Icon(Icons.directions, color: Colors.blue),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) =>
-                                      RutaAtencionScreen(alerta: alerta),
-                            ),
-                          );
-                        },
+                    ),
+
+                    // Indicador de progreso compacto
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: StepProgressIndicator(
+                        totalSteps: 4,
+                        currentStep: obtenerPasoEstado(alerta.status),
+                        selectedColor: Colors.blue,
+                        unselectedColor: Colors.grey[300]!,
+                        size: 4,
                       ),
                     ),
-                    StepProgressIndicator(
-                      totalSteps: 4,
-                      currentStep: obtenerPasoEstado(alerta.status),
-                      selectedColor: Colors.blue,
-                      unselectedColor: Colors.grey[300]!,
-                      customStep: (index, color, _) {
-                        List<String> labels = [
-                          'Pendiente',
-                          'Asignado',
-                          'En Camino',
-                          'Atendida',
-                        ];
-                        return Container(
-                          color: color,
-                          child: Center(
-                            child: Text(
-                              labels[index],
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                    SizedBox(height: 8),
+
+                    // Mapa más grande
                     SizedBox(
-                      height: 200,
+                      height: 250, // Aumentado de 200 a 250
                       child: FlutterMap(
                         options: MapOptions(
                           center: LatLng(alerta.lat ?? 0, alerta.lng ?? 0),
@@ -199,14 +290,14 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 10),
 
-                    // Botón principal para atender alerta
+                    // Botones de acción compactos
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: Row(
                         children: [
                           Expanded(
+                            flex: 2,
                             child: ElevatedButton.icon(
                               onPressed: () {
                                 Navigator.push(
@@ -217,30 +308,37 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                                             RutaAtencionScreen(alerta: alerta),
                                   ),
                                 ).then((_) {
-                                  // Recargar alertas cuando regrese
                                   setState(() {
                                     _cargarAlertas();
                                   });
                                 });
                               },
-                              icon: Icon(Icons.navigation),
-                              label: Text('ATENDER ALERTA'),
+                              icon: Icon(Icons.navigation, size: 16),
+                              label: Text(
+                                'ATENDER',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                                 foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(vertical: 12),
+                                padding: EdgeInsets.symmetric(vertical: 8),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
                             ),
                           ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            flex: 1,
+                            child: _buildBotonEstadoCompacto(alerta),
+                          ),
                         ],
                       ),
                     ),
-
-                    _buildBotonesEstado(alerta),
-                    SizedBox(height: 10),
                   ],
                 ),
               );
@@ -251,10 +349,10 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
     );
   }
 
-  Widget _buildBotonesEstado(Alerta alerta) {
+  Widget _buildBotonEstadoCompacto(Alerta alerta) {
     List<String> estados = ['pendiente', 'asignado', 'en camino', 'atendida'];
-
     int indexActual = estados.indexOf(alerta.status);
+
     if (indexActual == -1 || indexActual == estados.length - 1) {
       return SizedBox(); // Ya está en el último estado
     }
@@ -263,7 +361,30 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
 
     return ElevatedButton(
       onPressed: () => actualizarEstado(alerta, siguienteEstado),
-      child: Text('Pasar a "$siguienteEstado"'),
+      child: Text(
+        _getTextoSiguienteEstado(siguienteEstado),
+        style: TextStyle(fontSize: 11),
+        textAlign: TextAlign.center,
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
     );
+  }
+
+  String _getTextoSiguienteEstado(String estado) {
+    switch (estado) {
+      case 'asignado':
+        return 'ASIGNAR';
+      case 'en camino':
+        return 'IR';
+      case 'atendida':
+        return 'ATENDER';
+      default:
+        return estado.toUpperCase();
+    }
   }
 }
