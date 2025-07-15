@@ -25,6 +25,7 @@ class Alerta {
   final String id;
   final String direccion;
   final String usuarioCreador;
+  final String? nombreUsuario; // Nombre completo del usuario
   final DateTime fechaHora;
   final String detalle;
   final String status;
@@ -47,6 +48,7 @@ class Alerta {
     required this.id,
     required this.direccion,
     required this.usuarioCreador,
+    this.nombreUsuario,
     required this.fechaHora,
     required this.detalle,
     required this.status,
@@ -69,6 +71,7 @@ class Alerta {
       id: json['_id'] ?? '',
       direccion: json['direccion'] ?? '',
       usuarioCreador: json['usuarioCreador'] ?? '',
+      nombreUsuario: json['nombreUsuario'],
       fechaHora: DateTime.parse(json['fechaHora']),
       detalle: json['detalle'] ?? '',
       status: json['status'] ?? '',
@@ -81,8 +84,14 @@ class Alerta {
           json['rutaAtencion'] != null
               ? RutaAtencion.fromJson(json['rutaAtencion'])
               : null,
-      lat: json['ubicacion']?['lat']?.toDouble(),
-      lng: json['ubicacion']?['lng']?.toDouble(),
+      lat:
+          json['ubicacion']?['lat']?.toDouble() ??
+          json['lat']?.toDouble() ??
+          json['latitude']?.toDouble(),
+      lng:
+          json['ubicacion']?['lng']?.toDouble() ??
+          json['lng']?.toDouble() ??
+          json['longitude']?.toDouble(),
       visible: json['visible'] ?? true, // Campo de visibilidad
       calle: json['calle'],
       barrio: json['barrio'],

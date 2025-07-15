@@ -1,5 +1,6 @@
 // lib/config/routes.dart
 import 'package:flutter/material.dart';
+import 'package:geo_app/screens/reportes_alertas_screen.dart';
 
 import '../screens/actualizar_datos_screen.dart';
 import '../screens/alert_screen.dart';
@@ -32,4 +33,5 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/atender-alerta': (_) => AlertaPoliceScreen(),
   '/contactos': (_) => ContactosScreen(),
   '/notificaciones': (_) => NotificacionesScreen(),
+  '/reportes-alertas': (_) => ReportesAlertasScreen(),
 };

@@ -348,6 +348,9 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
                 TileLayer(
                   urlTemplate: AppConfig.mapTileUrl,
                   subdomains: AppConfig.mapSubdomains,
+                  userAgentPackageName: 'com.example.geo_app',
+                  retinaMode: true,
+                  maxZoom: 19,
                 ),
 
                 // Línea de ruta real por calles

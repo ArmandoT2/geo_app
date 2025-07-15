@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,6 +35,13 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
   String _estadoActual = '';
   double _distanciaRuta = 0.0; // Distancia real de la ruta
   double _tiempoEstimado = 0.0; // Tiempo estimado en minutos
+  File? _archivoSeleccionado;
+  Uint8List? _archivoWebBytes;
+  String? _nombreArchivoWeb;
+  String? _urlSubida;
+
+  final String cloudName = 'ddkoq06ti';
+  final String uploadPreset = 'unsigned';
 
   final MapController _mapController = MapController();
 
@@ -41,6 +52,21 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
   void initState() {
     super.initState();
     _estadoActual = widget.alerta.status;
+
+    // Debug: Imprimir información de la alerta en RutaAtencionScreen
+    print('=== DEBUG RUTA ATENCION SCREEN ===');
+    print('Alerta ID: ${widget.alerta.id}');
+    print('Dirección (campo original): "${widget.alerta.direccion}"');
+    print('Dirección completa (getter): "${widget.alerta.direccionCompleta}"');
+    print('Campos individuales:');
+    print('  * Calle: "${widget.alerta.calle ?? 'null'}"');
+    print('  * Barrio: "${widget.alerta.barrio ?? 'null'}"');
+    print('  * Ciudad: "${widget.alerta.ciudad ?? 'null'}"');
+    print('  * Estado: "${widget.alerta.estado ?? 'null'}"');
+    print('  * País: "${widget.alerta.pais ?? 'null'}"');
+    print('  * Código Postal: "${widget.alerta.codigoPostal ?? 'null'}"');
+    print('==============================');
+
     _inicializarUbicaciones();
     _obtenerInfoUsuarioCreador();
   }
@@ -334,14 +360,43 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
 
   Future<void> _actualizarEstadoAlerta(String nuevoEstado) async {
     if (!mounted) return;
-
-    setState(() {
-      _actualizandoEstado = true;
-    });
+    setState(() => _actualizandoEstado = true);
 
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       final policiaId = prefs.getString('userId') ?? '';
+      String? evidenciaUrl;
+
+      if (nuevoEstado == 'atendida') {
+        // Permitir completar sin evidencia, pero mostrar mensaje informativo
+        if ((!kIsWeb && _archivoSeleccionado == null) ||
+            (kIsWeb &&
+                (_archivoWebBytes == null || _nombreArchivoWeb == null))) {
+          // Solo mostrar mensaje informativo, no bloquear la operación
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'ℹ️ Completando alerta sin evidencia. Podrás cargarla después.',
+              ),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        } else {
+          // Si hay archivo, intentar subirlo
+          evidenciaUrl = await subirArchivoACloudinary();
+
+          if (evidenciaUrl == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ Error al subir evidencia a Cloudinary'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            setState(() => _actualizandoEstado = false);
+            return;
+          }
+        }
+      }
 
       final actualizado = await AlertaService().actualizarEstado(
         widget.alerta.id,
@@ -351,26 +406,20 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
         origenLng: _ubicacionPolicia?.longitude,
         destinoLat: _ubicacionAlerta?.latitude,
         destinoLng: _ubicacionAlerta?.longitude,
+        evidenciaUrl: evidenciaUrl,
       );
 
       if (!mounted) return;
 
       if (actualizado) {
-        setState(() {
-          _estadoActual = nuevoEstado;
-        });
-
+        setState(() => _estadoActual = nuevoEstado);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✅ Estado actualizado a: $nuevoEstado'),
             backgroundColor: Colors.green,
           ),
         );
-
-        // Si se completó la atención, regresar a la lista
-        if (nuevoEstado == 'atendida') {
-          Navigator.pop(context);
-        }
+        if (nuevoEstado == 'atendida') Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -382,18 +431,74 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error de conexión: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _actualizandoEstado = false;
-        });
+      if (mounted) setState(() => _actualizandoEstado = false);
+    }
+  }
+
+  Future<void> seleccionarArchivo() async {
+    final resultado = await FilePicker.platform.pickFiles(withData: true);
+
+    if (resultado != null) {
+      if (kIsWeb) {
+        _archivoWebBytes = resultado.files.first.bytes;
+        _nombreArchivoWeb = resultado.files.first.name;
+      } else {
+        _archivoSeleccionado = File(resultado.files.first.path!);
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '✅ Archivo seleccionado: ${resultado.files.first.name}',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<String?> subirArchivoACloudinary() async {
+    final cloudName = 'ddkoq06ti';
+    final uploadPreset = 'unsigned';
+
+    final uri = Uri.parse(
+      'https://api.cloudinary.com/v1_1/$cloudName/auto/upload',
+    );
+    final request = http.MultipartRequest('POST', uri);
+    request.fields['upload_preset'] = uploadPreset;
+
+    if (!kIsWeb && _archivoSeleccionado != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath('file', _archivoSeleccionado!.path),
+      );
+    } else if (kIsWeb &&
+        _archivoWebBytes != null &&
+        _nombreArchivoWeb != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          _archivoWebBytes!,
+          filename: _nombreArchivoWeb!,
+          contentType: MediaType('application', 'octet-stream'),
+        ),
+      );
+    } else {
+      return null;
+    }
+
+    final response = await request.send();
+    final res = await http.Response.fromStream(response);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(res.body);
+      return data['secure_url'];
+    } else {
+      print('❌ Cloudinary error: ${res.body}');
+      return null;
     }
   }
 
@@ -414,250 +519,59 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     );
   }
 
-  Future<String> _obtenerDireccionDesdeCoordenadas() async {
-    if (widget.alerta.lat == null || widget.alerta.lng == null) {
-      return 'Ubicación no disponible';
-    }
-
-    try {
-      // Usar servicio de geocodificación reversa para obtener dirección legible
-      final String url =
-          'https://nominatim.openstreetmap.org/reverse'
-          '?format=json'
-          '&lat=${widget.alerta.lat}'
-          '&lon=${widget.alerta.lng}'
-          '&addressdetails=1'
-          '&accept-language=es';
-
-      final response = await http
-          .get(Uri.parse(url), headers: {'User-Agent': 'GeoApp/1.0'})
-          .timeout(Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final address = data['address'];
-
-        if (address != null) {
-          List<String> partesDireccion = [];
-
-          // Construir dirección legible
-          if (address['road'] != null) {
-            partesDireccion.add(address['road']);
-          }
-          if (address['neighbourhood'] != null) {
-            partesDireccion.add(address['neighbourhood']);
-          } else if (address['suburb'] != null) {
-            partesDireccion.add(address['suburb']);
-          }
-          if (address['city'] != null) {
-            partesDireccion.add(address['city']);
-          } else if (address['town'] != null) {
-            partesDireccion.add(address['town']);
-          } else if (address['village'] != null) {
-            partesDireccion.add(address['village']);
-          }
-
-          if (partesDireccion.isNotEmpty) {
-            return partesDireccion.join(', ');
-          }
-        }
-
-        // Si hay display_name pero no pudimos construir la dirección detallada
-        if (data['display_name'] != null) {
-          String displayName = data['display_name'];
-          // Tomar solo las primeras 3 partes para que no sea muy largo
-          List<String> partes = displayName.split(',').take(3).toList();
-          return partes.join(',').trim();
-        }
-      }
-    } catch (e) {
-      print('Error al obtener dirección desde coordenadas: $e');
-    }
-
-    return 'Ubicación: ${widget.alerta.lat!.toStringAsFixed(4)}, ${widget.alerta.lng!.toStringAsFixed(4)}';
-  }
-
-  Widget _buildInfoUsuarioCreador() {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.green[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.person, color: Colors.green[700], size: 16),
-              SizedBox(width: 4),
-              Text(
-                'Ciudadano que Reportó:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green[700],
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 4),
-          if (_infoUsuarioCreador != null) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_infoUsuarioCreador!['fullName'] ?? 'Nombre no disponible'}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[800],
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'CIUDADANO',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.green[100],
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.person, color: Colors.green[700], size: 20),
-                ),
-              ],
-            ),
-          ] else ...[
-            // Mientras se carga la información
-            Row(
-              children: [
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Obteniendo información del ciudadano...',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildDireccionDetallada() {
-    List<String> partesDireccion = [];
+    String direccionCompleta = _construirDireccionMejor();
 
-    // Agregar calle si existe
-    if (widget.alerta.calle != null && widget.alerta.calle!.isNotEmpty) {
-      partesDireccion.add(widget.alerta.calle!);
-    }
-
-    // Agregar barrio si existe
-    if (widget.alerta.barrio != null && widget.alerta.barrio!.isNotEmpty) {
-      partesDireccion.add(widget.alerta.barrio!);
-    }
-
-    // Agregar ciudad si existe
-    if (widget.alerta.ciudad != null && widget.alerta.ciudad!.isNotEmpty) {
-      partesDireccion.add(widget.alerta.ciudad!);
-    }
-
-    // Si tenemos información detallada, usarla
-    if (partesDireccion.isNotEmpty) {
-      return Text(
-        partesDireccion.join(', '),
-        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-      );
-    }
-
-    // Si no hay información detallada pero tenemos dirección general que no son coordenadas
-    if (widget.alerta.direccion.isNotEmpty &&
-        !widget.alerta.direccion.contains('lat') &&
-        !RegExp(
-          r'^-?\d+\.?\d*,-?\d+\.?\d*$',
-        ).hasMatch(widget.alerta.direccion.trim())) {
-      return Text(
-        widget.alerta.direccion,
-        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-      );
-    }
-
-    // Usar FutureBuilder para obtener dirección desde coordenadas
-    return FutureBuilder<String>(
-      future: _obtenerDireccionDesdeCoordenadas(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Row(
-            children: [
-              SizedBox(
-                width: 12,
-                height: 12,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Obteniendo ubicación...',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          );
-        }
-
-        if (snapshot.hasData) {
-          return Text(
-            snapshot.data!,
-            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-          );
-        }
-
-        // Fallback final
-        return Text(
-          'Ubicación por determinar',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[500],
-            fontStyle: FontStyle.italic,
-          ),
-        );
-      },
+    return Text(
+      direccionCompleta,
+      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
     );
+  }
+
+  String _construirDireccionMejor() {
+    // Priorizar el campo 'direccion' si contiene información completa
+    if (widget.alerta.direccion.isNotEmpty &&
+        widget.alerta.direccion.contains(',') &&
+        !widget.alerta.direccion.contains('Lat:')) {
+      return widget.alerta.direccion;
+    }
+
+    // Si no, construir desde campos individuales
+    List<String> partes = [];
+
+    if (widget.alerta.calle != null && widget.alerta.calle!.isNotEmpty) {
+      partes.add(widget.alerta.calle!);
+    }
+    if (widget.alerta.barrio != null && widget.alerta.barrio!.isNotEmpty) {
+      partes.add(widget.alerta.barrio!);
+    }
+    if (widget.alerta.ciudad != null && widget.alerta.ciudad!.isNotEmpty) {
+      partes.add(widget.alerta.ciudad!);
+    }
+    if (widget.alerta.estado != null && widget.alerta.estado!.isNotEmpty) {
+      partes.add(widget.alerta.estado!);
+    }
+    if (widget.alerta.pais != null && widget.alerta.pais!.isNotEmpty) {
+      partes.add(widget.alerta.pais!);
+    }
+
+    if (partes.length >= 2) {
+      return partes.join(', ');
+    }
+
+    // Fallback al campo direccion original
+    if (widget.alerta.direccion.isNotEmpty) {
+      return widget.alerta.direccion;
+    }
+
+    // Último recurso: coordenadas
+    if (widget.alerta.lat != null && widget.alerta.lng != null) {
+      return 'Lat: ${widget.alerta.lat!.toStringAsFixed(4)}, Lng: ${widget.alerta.lng!.toStringAsFixed(4)}';
+    }
+
+    return 'Ubicación no disponible';
   }
 
   Future<void> _obtenerInfoUsuarioCreador() async {
@@ -703,384 +617,496 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
               ? LoadingWidget(message: 'Obteniendo ubicaciones...')
               : Stack(
                 children: [
-                  Column(
-                    children: [
-                      // Información de la alerta
-                      Container(
-                        padding: EdgeInsets.all(16),
-                        color: Colors.red[50],
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '🚨 Emergencia Activa',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red[700],
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              widget.alerta.detalle,
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            SizedBox(height: 8),
-
-                            // Información de ubicación detallada
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.blue[200]!),
-                              ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Column(
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(
+                                      4,
+                                    ), // Reducido de 8 a 4
+                                    color: Colors.red[50],
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '🚨 Emergencia Activa',
+                                          style: TextStyle(
+                                            fontSize: 16, // Reducido de 18 a 16
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red[700],
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          height: 2,
+                                        ), // Reducido de 4 a 2
+                                        Text(
+                                          widget.alerta.detalle,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                          ), // Reducido de 16 a 14
+                                        ),
+                                        SizedBox(
+                                          height: 4,
+                                        ), // Reducido de 6 a 4
+                                        // Información combinada del incidente y ciudadano
+                                        Container(
+                                          padding: EdgeInsets.all(
+                                            6,
+                                          ), // Reducido de 8 a 6
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.grey[300]!,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              // Ubicación del incidente
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.location_on,
+                                                    color: Colors.blue[700],
+                                                    size:
+                                                        14, // Reducido de 16 a 14
+                                                  ),
+                                                  SizedBox(
+                                                    width: 3,
+                                                  ), // Reducido de 4 a 3
+                                                  Text(
+                                                    'Ubicación del Incidente:',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.blue[700],
+                                                      fontSize:
+                                                          12, // Reducido de 14 a 12
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(
+                                                height: 2,
+                                              ), // Reducido de 3 a 2
+                                              _buildDireccionDetallada(),
+
+                                              SizedBox(
+                                                height: 4,
+                                              ), // Reducido de 6 a 4
+                                              // Información del ciudadano
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.person,
+                                                    color: Colors.green[700],
+                                                    size:
+                                                        14, // Reducido de 16 a 14
+                                                  ),
+                                                  SizedBox(
+                                                    width: 3,
+                                                  ), // Reducido de 4 a 3
+                                                  Text(
+                                                    'Ciudadano que Reportó:',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.green[700],
+                                                      fontSize:
+                                                          12, // Reducido de 14 a 12
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(
+                                                height: 2,
+                                              ), // Reducido de 3 a 2
+                                              if (_infoUsuarioCreador !=
+                                                  null) ...[
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            '${_infoUsuarioCreador!['fullName'] ?? 'Nombre no disponible'}',
+                                                            style: TextStyle(
+                                                              fontSize:
+                                                                  12, // Reducido de 14 a 12
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color:
+                                                                  Colors
+                                                                      .grey[800],
+                                                            ),
+                                                          ),
+                                                          SizedBox(
+                                                            height: 1,
+                                                          ), // Reducido de 2 a 1
+                                                          Container(
+                                                            padding: EdgeInsets.symmetric(
+                                                              horizontal:
+                                                                  4, // Reducido de 6 a 4
+                                                              vertical:
+                                                                  1, // Reducido de 2 a 1
+                                                            ),
+                                                            decoration: BoxDecoration(
+                                                              color:
+                                                                  Colors
+                                                                      .green[100],
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    4,
+                                                                  ),
+                                                            ),
+                                                            child: Text(
+                                                              'CIUDADANO',
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color:
+                                                                    Colors
+                                                                        .green[700],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                      width:
+                                                          28, // Reducido de 32 a 28
+                                                      height:
+                                                          28, // Reducido de 32 a 28
+                                                      decoration: BoxDecoration(
+                                                        color:
+                                                            Colors.green[100],
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Icon(
+                                                        Icons.person,
+                                                        color:
+                                                            Colors.green[700],
+                                                        size:
+                                                            16, // Reducido de 18 a 16
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ] else ...[
+                                                Row(
+                                                  children: [
+                                                    SizedBox(
+                                                      width: 12,
+                                                      height: 12,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      'Obteniendo información...',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[600],
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+
+                                        SizedBox(
+                                          height: 2,
+                                        ), // Reducido de 4 a 2
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Chip(
+                                              label: Text(
+                                                _estadoActual.toUpperCase(),
+                                              ),
+                                              backgroundColor: _getColorEstado(
+                                                _estadoActual,
+                                              ),
+                                              labelStyle: TextStyle(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  'Distancia: ${_calcularDistancia().toStringAsFixed(2)} km',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.blue[700],
+                                                  ),
+                                                ),
+                                                if (_tiempoEstimado > 0)
+                                                  Text(
+                                                    'Tiempo est.: ${_tiempoEstimado.toStringAsFixed(0)} min',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.blue[600],
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(height: 4), // Reducido de 6 a 4
+                                  Container(
+                                    height:
+                                        constraints.maxHeight *
+                                        0.75, // Aumentado a 75% para un mapa más grande
+                                    child: FlutterMap(
+                                      mapController: _mapController,
+                                      options: MapOptions(
+                                        center:
+                                            _ubicacionPolicia ??
+                                            LatLng(-12.0464, -77.0428),
+                                        zoom: 13,
+                                      ),
+                                      children: [
+                                        TileLayer(
+                                          urlTemplate: AppConfig.mapTileUrl,
+                                          subdomains: AppConfig.mapSubdomains,
+                                          userAgentPackageName:
+                                              'com.example.geo_app',
+                                          retinaMode: true,
+                                          maxZoom: 19,
+                                        ),
+                                        if (_puntosRuta.isNotEmpty)
+                                          PolylineLayer(
+                                            polylines: [
+                                              Polyline(
+                                                points: _puntosRuta,
+                                                strokeWidth: 5.0,
+                                                color: Colors.blue[700]!,
+                                                borderStrokeWidth: 2.0,
+                                                borderColor: Colors.white,
+                                              ),
+                                            ],
+                                          ),
+                                        MarkerLayer(
+                                          markers: [
+                                            if (_ubicacionPolicia != null)
+                                              Marker(
+                                                point: _ubicacionPolicia!,
+                                                builder:
+                                                    (ctx) => Column(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.local_police,
+                                                          color: Colors.blue,
+                                                          size: 40,
+                                                        ),
+                                                        Container(
+                                                          padding:
+                                                              EdgeInsets.symmetric(
+                                                                horizontal: 4,
+                                                                vertical: 2,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.blue,
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            'POLICÍA',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 10,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                              ),
+                                            if (_ubicacionAlerta != null)
+                                              Marker(
+                                                point: _ubicacionAlerta!,
+                                                builder:
+                                                    (ctx) => Column(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.emergency,
+                                                          color: Colors.red,
+                                                          size: 40,
+                                                        ),
+                                                        Container(
+                                                          padding:
+                                                              EdgeInsets.symmetric(
+                                                                horizontal: 4,
+                                                                vertical: 2,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.red,
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            'EMERGENCIA',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 10,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(16),
+                            child: SingleChildScrollView(
+                              // ← Solución agregada
+                              child: Column(
+                                mainAxisSize:
+                                    MainAxisSize
+                                        .min, // ← evita expansión innecesaria
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(
-                                        Icons.location_on,
-                                        color: Colors.blue[700],
-                                        size: 16,
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed:
+                                              _actualizandoEstado ||
+                                                      _cargandoRuta ||
+                                                      !mounted
+                                                  ? null
+                                                  : () {
+                                                    if (mounted)
+                                                      _ajustarVistaDelMapa();
+                                                  },
+                                          icon: Icon(
+                                            Icons.center_focus_strong,
+                                            size: 16,
+                                          ),
+                                          label: Text('Centrar'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.grey[600],
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 8,
+                                            ),
+                                            minimumSize: Size(0, 36),
+                                          ),
+                                        ),
                                       ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Ubicación del Incidente:',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.blue[700],
-                                          fontSize: 14,
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed:
+                                              _actualizandoEstado ||
+                                                      _cargandoRuta ||
+                                                      !mounted
+                                                  ? null
+                                                  : () {
+                                                    if (mounted)
+                                                      _obtenerRutaReal();
+                                                  },
+                                          icon: Icon(Icons.route, size: 16),
+                                          label: Text('Ruta'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green[600],
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 8,
+                                            ),
+                                            minimumSize: Size(0, 36),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed:
+                                              _actualizandoEstado ||
+                                                      _cargandoRuta ||
+                                                      !mounted
+                                                  ? null
+                                                  : () {
+                                                    if (mounted)
+                                                      _inicializarUbicaciones();
+                                                  },
+                                          icon: Icon(
+                                            Icons.my_location,
+                                            size: 16,
+                                          ),
+                                          label: Text('GPS'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blue[600],
+                                            foregroundColor: Colors.white,
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 8,
+                                            ),
+                                            minimumSize: Size(0, 36),
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 4),
-                                  _buildDireccionDetallada(),
+                                  SizedBox(height: 12),
+                                  _buildBotonesEstado(),
                                 ],
                               ),
                             ),
-                            SizedBox(height: 8),
-
-                            // Información del usuario que reportó la alerta
-                            _buildInfoUsuarioCreador(),
-                            SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Chip(
-                                  label: Text(_estadoActual.toUpperCase()),
-                                  backgroundColor: _getColorEstado(
-                                    _estadoActual,
-                                  ),
-                                  labelStyle: TextStyle(color: Colors.white),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'Distancia: ${_calcularDistancia().toStringAsFixed(2)} km',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue[700],
-                                      ),
-                                    ),
-                                    if (_tiempoEstimado > 0)
-                                      Text(
-                                        'Tiempo est.: ${_tiempoEstimado.toStringAsFixed(0)} min',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.blue[600],
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Mapa con ruta
-                      Expanded(
-                        child: FlutterMap(
-                          mapController: _mapController,
-                          options: MapOptions(
-                            center:
-                                _ubicacionPolicia ?? LatLng(-12.0464, -77.0428),
-                            zoom: 13,
                           ),
-                          children: [
-                            TileLayer(
-                              urlTemplate: AppConfig.mapTileUrl,
-                              subdomains: AppConfig.mapSubdomains,
-                            ),
-
-                            // Línea de ruta
-                            if (_puntosRuta.isNotEmpty)
-                              PolylineLayer(
-                                polylines: [
-                                  Polyline(
-                                    points: _puntosRuta,
-                                    strokeWidth: 5.0,
-                                    color: Colors.blue[700]!,
-                                    borderStrokeWidth: 2.0,
-                                    borderColor: Colors.white,
-                                  ),
-                                ],
-                              ),
-
-                            // Marcadores
-                            MarkerLayer(
-                              markers: [
-                                // Marcador de ubicación de policía (origen)
-                                if (_ubicacionPolicia != null)
-                                  Marker(
-                                    point: _ubicacionPolicia!,
-                                    builder:
-                                        (ctx) => Container(
-                                          child: Column(
-                                            children: [
-                                              Icon(
-                                                Icons.local_police,
-                                                color: Colors.blue,
-                                                size: 40,
-                                              ),
-                                              Container(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: 4,
-                                                  vertical: 2,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.blue,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  'POLICÍA',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                  ),
-
-                                // Marcador de ubicación de alerta (destino)
-                                if (_ubicacionAlerta != null)
-                                  Marker(
-                                    point: _ubicacionAlerta!,
-                                    builder:
-                                        (ctx) => Container(
-                                          child: Column(
-                                            children: [
-                                              Icon(
-                                                Icons.emergency,
-                                                color: Colors.red,
-                                                size: 40,
-                                              ),
-                                              Container(
-                                                padding: EdgeInsets.symmetric(
-                                                  horizontal: 4,
-                                                  vertical: 2,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.red,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  'EMERGENCIA',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Botones de acción
-                      Container(
-                        padding: EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed:
-                                        _actualizandoEstado ||
-                                                _cargandoRuta ||
-                                                !mounted
-                                            ? null
-                                            : () {
-                                              if (mounted)
-                                                _ajustarVistaDelMapa();
-                                            },
-                                    icon: Icon(
-                                      Icons.center_focus_strong,
-                                      size: 16,
-                                    ),
-                                    label: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        // Usar texto más corto en pantallas pequeñas
-                                        String texto =
-                                            constraints.maxWidth < 80
-                                                ? 'Centro'
-                                                : 'Centrar';
-                                        return Flexible(
-                                          child: Text(
-                                            texto,
-                                            style: TextStyle(
-                                              fontSize:
-                                                  constraints.maxWidth < 80
-                                                      ? 10
-                                                      : constraints.maxWidth <
-                                                          100
-                                                      ? 11
-                                                      : 12,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.grey[600],
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 8,
-                                      ),
-                                      minimumSize: Size(0, 36),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed:
-                                        _actualizandoEstado ||
-                                                _cargandoRuta ||
-                                                !mounted
-                                            ? null
-                                            : () {
-                                              if (mounted) _obtenerRutaReal();
-                                            },
-                                    icon: Icon(Icons.route, size: 16),
-                                    label: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        // Usar textos progresivamente más cortos según el espacio
-                                        String texto;
-                                        if (constraints.maxWidth < 70) {
-                                          texto = 'Ruta';
-                                        } else if (constraints.maxWidth < 100) {
-                                          texto = 'Calcular';
-                                        } else {
-                                          texto = 'Recalcular';
-                                        }
-                                        return Flexible(
-                                          child: Text(
-                                            texto,
-                                            style: TextStyle(
-                                              fontSize:
-                                                  constraints.maxWidth < 70
-                                                      ? 10
-                                                      : constraints.maxWidth <
-                                                          100
-                                                      ? 11
-                                                      : 12,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green[600],
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 8,
-                                      ),
-                                      minimumSize: Size(0, 36),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed:
-                                        _actualizandoEstado ||
-                                                _cargandoRuta ||
-                                                !mounted
-                                            ? null
-                                            : () {
-                                              if (mounted)
-                                                _inicializarUbicaciones();
-                                            },
-                                    icon: Icon(Icons.my_location, size: 16),
-                                    label: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        return Flexible(
-                                          child: Text(
-                                            'GPS',
-                                            style: TextStyle(
-                                              fontSize:
-                                                  constraints.maxWidth < 80
-                                                      ? 10
-                                                      : constraints.maxWidth <
-                                                          100
-                                                      ? 11
-                                                      : 12,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue[600],
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 8,
-                                      ),
-                                      minimumSize: Size(0, 36),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            SizedBox(height: 12),
-
-                            // Botones de estado
-                            _buildBotonesEstado(),
-                          ],
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
-
-                  // Indicador de carga para la ruta
                   if (_cargandoRuta)
                     Container(
                       color: Colors.black.withOpacity(0.3),
@@ -1148,62 +1174,93 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     }
 
     if (siguienteEstado == null) {
-      return Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.green[100],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: Colors.green[700]),
-            SizedBox(width: 8),
-            Text(
-              'Alerta Completada',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.green[700],
+      return Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green[700]),
+                SizedBox(width: 8),
+                Text(
+                  'Alerta Completada',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 12),
+          // Botón para cargar evidencia después de completar la alerta
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: seleccionarArchivo,
+              icon: Icon(Icons.attach_file),
+              label: Text('Cargar Evidencia'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton.icon(
-        onPressed:
-            _actualizandoEstado || !mounted
-                ? null
-                : () {
-                  if (mounted)
-                    _actualizarEstadoAlerta(siguienteEstado!['estado']);
-                },
-        icon:
-            _actualizandoEstado
-                ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-                : Icon(siguienteEstado['icon']),
-        label: Text(
-          _actualizandoEstado ? 'ACTUALIZANDO...' : siguienteEstado['texto'],
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return Column(
+      children: [
+        // Botón principal de acción
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton.icon(
+            onPressed:
+                _actualizandoEstado || !mounted
+                    ? null
+                    : () {
+                      if (mounted)
+                        _actualizarEstadoAlerta(siguienteEstado!['estado']);
+                    },
+            icon:
+                _actualizandoEstado
+                    ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                    : Icon(siguienteEstado['icon']),
+            label: Text(
+              _actualizandoEstado
+                  ? 'ACTUALIZANDO...'
+                  : siguienteEstado['texto'],
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: siguienteEstado['color'],
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
         ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: siguienteEstado['color'],
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
+      ],
     );
   }
 

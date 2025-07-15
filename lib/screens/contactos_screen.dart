@@ -180,51 +180,31 @@ class _ContactosScreenState extends State<ContactosScreen> {
         children: [
           // Banner informativo para modo desarrollo
           if (AppConfig.useMockData)
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(12),
-              color: Colors.amber[100],
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.amber[800]),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Modo desarrollo: Usando datos simulados',
-                      style: TextStyle(
-                        color: Colors.amber[800],
-                        fontWeight: FontWeight.w500,
+            // Contenido principal
+            Expanded(
+              child:
+                  _cargando
+                      ? LoadingWidget(message: 'Cargando contactos...')
+                      : _contactos.isEmpty
+                      ? EmptyStateWidget(
+                        title: 'No tienes contactos',
+                        subtitle:
+                            'Agrega familiares y amigos para notificarles en caso de emergencia',
+                        icon: Icons.contacts,
+                        onRefresh: _cargarContactos,
+                      )
+                      : RefreshIndicator(
+                        onRefresh: _cargarContactos,
+                        child: ListView.builder(
+                          padding: EdgeInsets.all(16),
+                          itemCount: _contactos.length,
+                          itemBuilder: (context, index) {
+                            final contacto = _contactos[index];
+                            return _buildContactoCard(contacto);
+                          },
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
             ),
-          // Contenido principal
-          Expanded(
-            child:
-                _cargando
-                    ? LoadingWidget(message: 'Cargando contactos...')
-                    : _contactos.isEmpty
-                    ? EmptyStateWidget(
-                      title: 'No tienes contactos',
-                      subtitle:
-                          'Agrega familiares y amigos para notificarles en caso de emergencia',
-                      icon: Icons.contacts,
-                      onRefresh: _cargarContactos,
-                    )
-                    : RefreshIndicator(
-                      onRefresh: _cargarContactos,
-                      child: ListView.builder(
-                        padding: EdgeInsets.all(16),
-                        itemCount: _contactos.length,
-                        itemBuilder: (context, index) {
-                          final contacto = _contactos[index];
-                          return _buildContactoCard(contacto);
-                        },
-                      ),
-                    ),
-          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

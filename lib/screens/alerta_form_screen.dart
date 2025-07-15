@@ -181,6 +181,9 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
                         TileLayer(
                           urlTemplate: AppConfig.mapTileUrl,
                           subdomains: AppConfig.mapSubdomains,
+                          userAgentPackageName: 'com.example.geo_app',
+                          retinaMode: true,
+                          maxZoom: 19,
                         ),
                         MarkerLayer(
                           markers: [

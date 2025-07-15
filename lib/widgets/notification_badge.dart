@@ -50,16 +50,6 @@ class _NotificationBadgeState extends State<NotificationBadge> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('userId') ?? '';
 
-      if (userId.isNotEmpty) {
-        final notificaciones = await _contactoService
-            .obtenerNotificacionesPendientes(userId);
-
-        if (mounted) {
-          setState(() {
-            _contadorNotificaciones = notificaciones.length;
-          });
-        }
-      }
     } catch (e) {
       // Silenciar errores para no mostrar mensajes constantemente
       print('Error al cargar contador de notificaciones: $e');

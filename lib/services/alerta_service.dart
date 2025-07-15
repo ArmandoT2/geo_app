@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 import '../models/alerta_model.dart';
-import 'contacto_service.dart';
 
 class AlertaService {
   Future<List<Alerta>> obtenerAlertasPorUsuario(String userId) async {
@@ -45,27 +44,6 @@ class AlertaService {
           .timeout(Duration(seconds: AppConfig.connectionTimeout));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Alerta creada exitosamente, ahora notificar a los contactos
-        try {
-          final responseData = jsonDecode(response.body);
-          final alertaId = responseData['id']?.toString() ?? alerta.id;
-
-          final contactoService = ContactoService();
-          await contactoService.notificarContactosAlerta(
-            usuarioId: alerta.usuarioCreador,
-            alertaId: alertaId,
-            tipoAlerta: 'emergencia',
-            detalle: alerta.detalle,
-            latitud: alerta.lat,
-            longitud: alerta.lng,
-          );
-
-          print('✅ Contactos notificados correctamente');
-        } catch (e) {
-          print('⚠️ Alerta creada pero error al notificar contactos: $e');
-          // No fallar la creación de la alerta por errores de notificación
-        }
-
         return true;
       } else {
         print('Error al crear alerta: ${response.body}');
@@ -89,6 +67,18 @@ class AlertaService {
 
       if (response.statusCode == 200) {
         final List<dynamic> body = jsonDecode(response.body);
+
+        // Debug: Imprimir datos recibidos del backend
+        print('=== DEBUG BACKEND RESPONSE ===');
+        print('Status Code: ${response.statusCode}');
+        print('Response Body: ${response.body}');
+        print('Parsed Body Count: ${body.length}');
+
+        if (body.isNotEmpty) {
+          print('Primer elemento de ejemplo:');
+          print(body.first);
+        }
+
         return body.map((e) => Alerta.fromJson(e)).toList();
       } else {
         throw Exception(
@@ -110,34 +100,36 @@ class AlertaService {
     double? origenLng,
     double? destinoLat,
     double? destinoLng,
+    String? evidenciaUrl,
   }) async {
-    try {
-      Map<String, dynamic> body = {
-        'status': nuevoEstado,
-        'policiaId': policiaId,
-      };
+    final uri = Uri.parse('${AppConfig.alertasUrl}/$alertaId/status');
 
+    final body = {
+      'status': nuevoEstado,
+      'policiaId': policiaId,
       if (origenLat != null &&
           origenLng != null &&
           destinoLat != null &&
-          destinoLng != null) {
-        body['origen'] = {'lat': origenLat, 'lng': origenLng};
-        body['destino'] = {'lat': destinoLat, 'lng': destinoLng};
-      }
+          destinoLng != null)
+        'origen': {'lat': origenLat, 'lng': origenLng},
+      if (origenLat != null &&
+          origenLng != null &&
+          destinoLat != null &&
+          destinoLng != null)
+        'destino': {'lat': destinoLat, 'lng': destinoLng},
+      if (evidenciaUrl != null) 'evidenciaUrl': evidenciaUrl,
+    };
 
-      final response = await http
-          .put(
-            Uri.parse('${AppConfig.alertasUrl}/$alertaId/status'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(body),
-          )
-          .timeout(Duration(seconds: AppConfig.connectionTimeout));
+    final response = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(body),
+    );
 
-      return response.statusCode == 200;
-    } catch (e) {
-      print('Error en actualizarEstado: $e');
-      return false;
-    }
+    print('📤 Código de respuesta: ${response.statusCode}');
+    print('📤 Respuesta del servidor: ${response.body}');
+
+    return response.statusCode == 200;
   }
 
   // Métodos para gestión administrativa de alertas

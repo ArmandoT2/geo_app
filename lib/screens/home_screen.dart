@@ -75,9 +75,9 @@ class _HomeScreenState extends State<HomeScreen> {
             () => _navigateTo('/gestion-usuarios'),
           ),
           _buildMenuCard(
-            'Gestión de Alertas',
-            Icons.warning_rounded,
-            () => _navigateTo('/gestion-alertas'),
+            'Reportes de Alertas',
+            Icons.bar_chart,
+            () => _navigateTo('/reportes-alertas'),
           ),
         ];
       case 'policia':
@@ -86,6 +86,14 @@ class _HomeScreenState extends State<HomeScreen> {
             'Atención de Alertas',
             Icons.notifications_active,
             () => _navigateTo('/atender-alerta'),
+          ),
+          NotificationBadge(
+            onTap: () => _navigateTo('/notificaciones'),
+            child: _buildMenuCard(
+              'Notificaciones',
+              Icons.notifications,
+              () => _navigateTo('/notificaciones'),
+            ),
           ),
         ];
       case 'ciudadano':
@@ -105,14 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
             'Actualizar Datos',
             Icons.person_outline,
             () => _navigateTo('/actualizar-datos'),
-          ),
-          NotificationBadge(
-            onTap: () => _navigateTo('/notificaciones'),
-            child: _buildMenuCard(
-              'Notificaciones',
-              Icons.notifications,
-              () => _navigateTo('/notificaciones'),
-            ),
           ),
         ];
       default:
