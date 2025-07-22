@@ -114,6 +114,11 @@ class _HomeScreenState extends State<HomeScreen> {
             Icons.person_outline,
             () => _navigateTo('/actualizar-datos'),
           ),
+          _buildMenuCard(
+            'Configuración de Cuenta',
+            Icons.settings,
+            () => _navigateTo('/configuraciones-ciudadano'),
+          ),
         ];
       default:
         return [const Center(child: Text("Rol no reconocido"))];

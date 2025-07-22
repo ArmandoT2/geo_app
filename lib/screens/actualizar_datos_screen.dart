@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user_model.dart';
+import 'change_password_screen.dart';
 import 'editar_perfil_screen.dart';
 import 'eliminar_cuenta_screen.dart';
 
@@ -85,6 +86,13 @@ class _ActualizarDatosScreenState extends State<ActualizarDatosScreen> {
         ),
       );
     }
+  }
+
+  void _navegarACambiarContrasena() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => ChangePasswordScreen()),
+    );
   }
 
   @override
@@ -244,9 +252,7 @@ class _ActualizarDatosScreenState extends State<ActualizarDatosScreen> {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        subtitle: Text(
-                          'Actualizar información personal y cambiar contraseña',
-                        ),
+                        subtitle: Text('Actualizar información personal'),
                         trailing: Icon(Icons.arrow_forward_ios, size: 16),
                         onTap: _navegarAEditarPerfil,
                       ),
@@ -254,50 +260,97 @@ class _ActualizarDatosScreenState extends State<ActualizarDatosScreen> {
 
                     SizedBox(height: 8),
 
-                    // Botón Eliminar Cuenta
-                    Card(
-                      elevation: 2,
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.red.withOpacity(0.1),
-                          child: Icon(Icons.delete_forever, color: Colors.red),
-                        ),
-                        title: Text(
-                          'Eliminar Cuenta',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
+                    // Botón Cambiar Contraseña - Solo para ciudadanos
+                    if (_usuario!.rol == 'ciudadano')
+                      Card(
+                        elevation: 2,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.green.withOpacity(0.1),
+                            child: Icon(Icons.lock, color: Colors.green),
                           ),
+                          title: Text(
+                            'Cambiar Contraseña',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text('Actualizar tu contraseña de acceso'),
+                          trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: _navegarACambiarContrasena,
                         ),
-                        subtitle: Text(
-                          'Eliminar permanentemente tu cuenta de la aplicación',
-                        ),
-                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: _navegarAEliminarCuenta,
                       ),
-                    ),
+
+                    if (_usuario!.rol == 'ciudadano') SizedBox(height: 8),
+
+                    // Botón Eliminar Cuenta - Solo para administradores y policías
+                    if (_usuario!.rol != 'ciudadano')
+                      Card(
+                        elevation: 2,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.red.withOpacity(0.1),
+                            child: Icon(
+                              Icons.delete_forever,
+                              color: Colors.red,
+                            ),
+                          ),
+                          title: Text(
+                            'Eliminar Cuenta',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Eliminar permanentemente tu cuenta de la aplicación',
+                          ),
+                          trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: _navegarAEliminarCuenta,
+                        ),
+                      ),
 
                     SizedBox(height: 24),
 
-                    // Información de privacidad
+                    // Información de privacidad - Diferente según el rol
                     Container(
                       padding: EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
+                        color:
+                            _usuario!.rol == 'ciudadano'
+                                ? Colors.blue.withOpacity(0.1)
+                                : Colors.amber.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.amber.withOpacity(0.3),
+                          color:
+                              _usuario!.rol == 'ciudadano'
+                                  ? Colors.blue.withOpacity(0.3)
+                                  : Colors.amber.withOpacity(0.3),
                         ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: Colors.amber[700]),
+                          Icon(
+                            _usuario!.rol == 'ciudadano'
+                                ? Icons.info_outline
+                                : Icons.info_outline,
+                            color:
+                                _usuario!.rol == 'ciudadano'
+                                    ? Colors.blue[700]
+                                    : Colors.amber[700],
+                          ),
                           SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Tus datos personales están protegidos. Al eliminar tu cuenta, tus alertas permanecerán en el sistema para fines de registro y seguridad.',
+                              _usuario!.rol == 'ciudadano'
+                                  ? 'Para opciones adicionales de configuración y gestión de cuenta, ve a la sección "Configuración de Cuenta" en el menú principal.'
+                                  : 'Tus datos personales están protegidos. Al eliminar tu cuenta, tus alertas permanecerán en el sistema para fines de registro y seguridad.',
                               style: TextStyle(
-                                color: Colors.amber[700],
+                                color:
+                                    _usuario!.rol == 'ciudadano'
+                                        ? Colors.blue[700]
+                                        : Colors.amber[700],
                                 fontSize: 14,
                               ),
                             ),

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
 
@@ -12,11 +13,26 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final TextEditingController emailCtrl = TextEditingController();
+  final TextEditingController currentPasswordCtrl = TextEditingController();
   final TextEditingController newPasswordCtrl = TextEditingController();
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _cargarEmailUsuario();
+  }
+
+  Future<void> _cargarEmailUsuario() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email') ?? '';
+    emailCtrl.text = email;
+  }
+
   Future<void> changePassword(BuildContext context) async {
-    if (emailCtrl.text.trim().isEmpty || newPasswordCtrl.text.trim().isEmpty) {
+    if (emailCtrl.text.trim().isEmpty ||
+        currentPasswordCtrl.text.trim().isEmpty ||
+        newPasswordCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Por favor completa todos los campos')),
       );
@@ -34,6 +50,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'email': emailCtrl.text.trim(),
+              'currentPassword': currentPasswordCtrl.text.trim(),
               'newPassword': newPasswordCtrl.text.trim(),
             }),
           )
@@ -80,12 +97,34 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           children: [
             TextField(
               controller: emailCtrl,
-              decoration: InputDecoration(labelText: 'Correo electrónico'),
+              decoration: InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: Icon(Icons.email),
+                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
               keyboardType: TextInputType.emailAddress,
+              readOnly: true,
             ),
+            SizedBox(height: 16),
+            TextField(
+              controller: currentPasswordCtrl,
+              decoration: InputDecoration(
+                labelText: 'Contraseña actual',
+                prefixIcon: Icon(Icons.lock_outline),
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+            SizedBox(height: 16),
             TextField(
               controller: newPasswordCtrl,
-              decoration: InputDecoration(labelText: 'Nueva contraseña'),
+              decoration: InputDecoration(
+                labelText: 'Nueva contraseña',
+                prefixIcon: Icon(Icons.lock),
+                border: OutlineInputBorder(),
+              ),
               obscureText: true,
             ),
             SizedBox(height: 20),

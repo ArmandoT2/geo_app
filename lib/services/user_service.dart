@@ -143,7 +143,7 @@ class UserService {
   }
 
   // Eliminar cuenta del ciudadano (soft delete)
-  static Future<bool> eliminarCuentaCiudadano(
+  static Future<Map<String, dynamic>> eliminarCuentaCiudadano(
     String userId,
     String contrasena,
   ) async {
@@ -159,10 +159,27 @@ class UserService {
           )
           .timeout(Duration(seconds: AppConfig.connectionTimeout));
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        return {
+          'success': true,
+          'mensaje':
+              responseData['mensaje'] ?? 'Cuenta procesada correctamente',
+          'tipo': responseData['tipo'] ?? 'desactivacion',
+        };
+      } else {
+        final errorData = json.decode(response.body);
+        return {
+          'success': false,
+          'mensaje': errorData['mensaje'] ?? 'Error al procesar la solicitud',
+        };
+      }
     } catch (e) {
       print('Error en eliminarCuentaCiudadano: $e');
-      return false;
+      return {
+        'success': false,
+        'mensaje': 'Error de conexión. Intente nuevamente.',
+      };
     }
   }
 }

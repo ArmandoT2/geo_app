@@ -97,20 +97,22 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
 
     try {
       // Primero eliminar la cuenta en el backend
-      bool success = await UserService.eliminarCuentaCiudadano(
+      Map<String, dynamic> result = await UserService.eliminarCuentaCiudadano(
         widget.usuario.id,
         _passwordController.text.trim(),
       );
 
-      if (success) {
+      if (result['success'] == true) {
         // Si el backend se actualizó correctamente, limpiar datos locales
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.clear();
 
-        _mostrarMensaje('Cuenta eliminada correctamente');
+        // Mostrar mensaje específico según el tipo de eliminación
+        String mensaje = result['mensaje'] ?? 'Cuenta procesada correctamente';
+        _mostrarMensaje(mensaje);
 
         // Esperar un momento y navegar al login
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(Duration(seconds: 3));
         if (mounted) {
           Navigator.pushNamedAndRemoveUntil(
             context,
@@ -120,7 +122,7 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
         }
       } else {
         _mostrarMensaje(
-          'Error al eliminar cuenta en el servidor',
+          result['mensaje'] ?? 'Error al procesar la eliminación de cuenta',
           esError: true,
         );
       }

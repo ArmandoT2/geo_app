@@ -6,6 +6,7 @@ import '../screens/actualizar_datos_screen.dart';
 import '../screens/alert_screen.dart';
 import '../screens/alerta_police_screen.dart';
 import '../screens/change_password_screen.dart';
+import '../screens/configuraciones_ciudadano_screen.dart';
 import '../screens/contactos_screen.dart';
 import '../screens/crear_usuario_screen.dart';
 import '../screens/editar_usuario_screen.dart';
@@ -24,6 +25,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/gestion-usuarios': (context) => GestionUsuariosScreen(),
   '/gestion-alertas': (context) => GestionAlertasScreen(),
   '/actualizar-datos': (context) => ActualizarDatosScreen(),
+  '/configuraciones-ciudadano': (context) => ConfiguracionesCiudadanoScreen(),
   '/crear-usuario': (_) => CrearUsuarioScreen(),
   '/editar-usuario': (_) => EditarUsuarioScreen(),
   '/crear-alerta': (context) {
