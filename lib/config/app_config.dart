@@ -24,7 +24,6 @@ class AppConfig {
   // Endpoints de autenticación
   static String get loginUrl => '$apiUrl/auth/login';
   static String get registerUrl => '$apiUrl/auth/register';
-  static String get changePasswordUrl => '$apiUrl/auth/change-password';
 
   // Endpoints de alertas
   static String get alertasUrl => '$apiUrl/alertas';
@@ -37,6 +36,7 @@ class AppConfig {
 
   // Endpoints de usuarios
   static String get usuariosUrl => '$baseUrl/usuarios';
+  static String get changePasswordUrl => '$usuariosUrl/cambiar-password';
 
   // Configuraciones de mapa
   static const String mapTileUrl =
