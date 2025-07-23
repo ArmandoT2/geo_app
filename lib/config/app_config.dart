@@ -57,7 +57,7 @@ class AppConfig {
 
   // Función de debug para mostrar la configuración actual
   static void printConfig() {
-    print('🔧 AppConfig Debug Info:');
+    print('🔧 AppConfig Debug Info - Updated:');
     print('Is Web: $kIsWeb');
     if (!kIsWeb) {
       print('Platform: ${Platform.operatingSystem}');
@@ -65,5 +65,6 @@ class AppConfig {
     print('Base URL: $baseUrl');
     print('API URL: $apiUrl');
     print('Login URL: $loginUrl');
+    print('Change Password URL: $changePasswordUrl');
   }
 }
