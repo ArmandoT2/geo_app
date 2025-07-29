@@ -10,8 +10,8 @@ class AppConfig {
     }
 
     if (Platform.isAndroid) {
-      // Siempre usar 10.0.2.2 para Android (funciona tanto en emulador como dispositivo)
-      return 'http://10.0.2.2:3000';
+      // Usar IP de la máquina para conexión desde emulador
+      return 'http://192.168.100.124:3000';
     } else if (Platform.isIOS) {
       return 'http://localhost:3000';
     } else {
@@ -52,8 +52,8 @@ class AppConfig {
   static const int receiveTimeout = 30; // segundos
 
   // Modo desarrollo (sin backend)
-  static const bool developmentMode = true;
-  static const bool useMockData = true;
+  static const bool developmentMode = false;
+  static const bool useMockData = false;
 
   // Función de debug para mostrar la configuración actual
   static void printConfig() {

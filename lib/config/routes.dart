@@ -4,12 +4,14 @@ import 'package:geo_app/screens/reportes_alertas_screen.dart';
 
 import '../screens/actualizar_datos_screen.dart';
 import '../screens/alert_screen.dart';
+import '../screens/alerta_form_screen.dart';
 import '../screens/alerta_police_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/configuraciones_ciudadano_screen.dart';
 import '../screens/contactos_screen.dart';
 import '../screens/crear_usuario_screen.dart';
 import '../screens/editar_usuario_screen.dart';
+import '../screens/forgot_password_screen.dart';
 import '../screens/gestion_alertas_screen.dart';
 import '../screens/gestion_usuarios_screen.dart';
 import '../screens/home_screen.dart';
@@ -21,6 +23,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/login': (context) => LoginScreen(),
   '/register': (context) => RegisterScreen(),
   '/change-password': (context) => ChangePasswordScreen(),
+  '/forgot-password': (context) => ForgotPasswordScreen(),
   '/home': (context) => HomeScreen(),
   '/gestion-usuarios': (context) => GestionUsuariosScreen(),
   '/gestion-alertas': (context) => GestionAlertasScreen(),
@@ -29,6 +32,10 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/crear-usuario': (_) => CrearUsuarioScreen(),
   '/editar-usuario': (_) => EditarUsuarioScreen(),
   '/crear-alerta': (context) {
+    final userId = ModalRoute.of(context)!.settings.arguments as String? ?? '';
+    return AlertaFormScreen(userId: userId);
+  },
+  '/alertas-list': (context) {
     final userId = ModalRoute.of(context)!.settings.arguments as String? ?? '';
     return AlertaListScreen(userId: userId);
   },

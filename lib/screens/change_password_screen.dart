@@ -44,9 +44,25 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     });
 
     try {
+      // Obtener el userId desde SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+
+      if (userId == null || userId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error: No se pudo obtener el ID del usuario')),
+        );
+        return;
+      }
+
+      // Construir la URL correcta con el userId
+      final changePasswordUrl =
+          '${AppConfig.usuariosUrl}/$userId/cambiar-password';
+
       final response = await http
           .put(
-            Uri.parse(AppConfig.changePasswordUrl),
+            Uri.parse(changePasswordUrl),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'email': emailCtrl.text.trim(),
@@ -136,13 +152,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   padding: EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: Colors.blue,
                 ),
-                child:
-                    _isLoading
-                        ? CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                          'Actualizar Contraseña',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                child: _isLoading
+                    ? CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                        'Actualizar Contraseña',
+                        style: TextStyle(color: Colors.white),
+                      ),
               ),
             ),
           ],

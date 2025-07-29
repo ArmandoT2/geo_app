@@ -9,12 +9,10 @@ import '../models/user_model.dart';
 class UserService {
   static Future<List<User>> getUsuarios() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse(AppConfig.usuariosUrl),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(Duration(seconds: AppConfig.connectionTimeout));
+      final response = await http.get(
+        Uri.parse(AppConfig.usuariosUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: AppConfig.connectionTimeout));
 
       if (response.statusCode == 200) {
         List data = json.decode(response.body);
@@ -65,15 +63,27 @@ class UserService {
     }
   }
 
+  static Future<bool> eliminarUsuario(String userId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${AppConfig.usuariosUrl}/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: AppConfig.connectionTimeout));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error en eliminarUsuario: $e');
+      return false;
+    }
+  }
+
   // Obtener datos del usuario actual
   static Future<User?> obtenerUsuarioActual(String userId) async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.usuariosUrl}/$userId'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(Duration(seconds: AppConfig.connectionTimeout));
+      final response = await http.get(
+        Uri.parse('${AppConfig.usuariosUrl}/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: AppConfig.connectionTimeout));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

@@ -45,6 +45,62 @@ class _GestionUsuariosScreenState extends State<GestionUsuariosScreen> {
     await _cargarUsuarios(); // Recargar al volver
   }
 
+  Future<void> _eliminarUsuario(User usuario) async {
+    // Mostrar diálogo de confirmación
+    final bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Eliminar Usuario'),
+          content: Text(
+            '¿Estás seguro de que deseas eliminar al usuario "${usuario.fullName}"?\n\nEsta acción no se puede deshacer.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar == true) {
+      try {
+        final success = await UserService.eliminarUsuario(usuario.id);
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Usuario eliminado exitosamente'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          await _cargarUsuarios(); // Recargar la lista
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al eliminar usuario'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -53,28 +109,38 @@ class _GestionUsuariosScreenState extends State<GestionUsuariosScreen> {
         onPressed: _irCrearUsuario,
         child: Icon(Icons.add),
       ),
-      body:
-          _loading
-              ? Center(child: CircularProgressIndicator())
-              : _usuarios.isEmpty
+      body: _loading
+          ? Center(child: CircularProgressIndicator())
+          : _usuarios.isEmpty
               ? Center(child: Text('No hay usuarios registrados'))
               : ListView.builder(
-                itemCount: _usuarios.length,
-                itemBuilder: (context, index) {
-                  final u = _usuarios[index];
-                  return Card(
-                    margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    child: ListTile(
-                      title: Text(u.fullName),
-                      subtitle: Text(u.email),
-                      trailing: IconButton(
-                        icon: Icon(Icons.edit),
-                        onPressed: () => _irEditarUsuario(u),
+                  itemCount: _usuarios.length,
+                  itemBuilder: (context, index) {
+                    final u = _usuarios[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: ListTile(
+                        title: Text(u.fullName),
+                        subtitle: Text(u.email),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _irEditarUsuario(u),
+                              tooltip: 'Editar usuario',
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _eliminarUsuario(u),
+                              tooltip: 'Eliminar usuario',
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
     );
   }
 }

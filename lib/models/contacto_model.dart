@@ -28,24 +28,21 @@ class Contacto {
 
   factory Contacto.fromJson(Map<String, dynamic> json) {
     return Contacto(
-      id: json['id']?.toString() ?? '',
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       nombre: json['nombre']?.toString() ?? '',
       apellido: json['apellido']?.toString() ?? '',
       telefono: json['telefono']?.toString() ?? '',
       email: json['email']?.toString(),
       relacion: json['relacion']?.toString() ?? 'familiar',
       usuarioId: json['usuario_id']?.toString() ?? '',
-      notificacionesActivas:
-          json['notificaciones_activas'] == true ||
+      notificacionesActivas: json['notificaciones_activas'] == true ||
           json['notificaciones_activas'] == 1,
-      fechaCreacion:
-          json['fecha_creacion'] != null
-              ? DateTime.parse(json['fecha_creacion'])
-              : DateTime.now(),
-      fechaActualizacion:
-          json['fecha_actualizacion'] != null
-              ? DateTime.parse(json['fecha_actualizacion'])
-              : null,
+      fechaCreacion: json['fecha_creacion'] != null
+          ? DateTime.parse(json['fecha_creacion'])
+          : DateTime.now(),
+      fechaActualizacion: json['fecha_actualizacion'] != null
+          ? DateTime.parse(json['fecha_actualizacion'])
+          : null,
     );
   }
 

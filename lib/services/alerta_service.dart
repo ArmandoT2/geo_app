@@ -8,12 +8,10 @@ import '../models/alerta_model.dart';
 class AlertaService {
   Future<List<Alerta>> obtenerAlertasPorUsuario(String userId) async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.alertasUrl}/usuario/$userId'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(Duration(seconds: AppConfig.connectionTimeout));
+      final response = await http.get(
+        Uri.parse('${AppConfig.alertasUrl}/usuario/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: AppConfig.connectionTimeout));
 
       print('Respuesta status: ${response.statusCode}');
       print('Respuesta body: ${response.body}');
@@ -33,8 +31,12 @@ class AlertaService {
     }
   }
 
-  Future<bool> crearAlerta(Alerta alerta) async {
+  Future<Alerta?> crearAlerta(Alerta alerta) async {
     try {
+      print('=== ENVIANDO ALERTA ===');
+      print('URL: ${AppConfig.crearAlertaUrl}');
+      print('Datos a enviar: ${jsonEncode(alerta.toJson())}');
+
       final response = await http
           .post(
             Uri.parse(AppConfig.crearAlertaUrl),
@@ -43,27 +45,37 @@ class AlertaService {
           )
           .timeout(Duration(seconds: AppConfig.connectionTimeout));
 
+      print('=== RESPUESTA DEL BACKEND ===');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
+        print('✅ Alerta creada exitosamente');
+        final responseData = json.decode(response.body);
+        if (responseData['alerta'] != null) {
+          return Alerta.fromJson(responseData['alerta']);
+        } else {
+          print('⚠️ Respuesta no contiene la alerta creada');
+          return null;
+        }
       } else {
-        print('Error al crear alerta: ${response.body}');
-        return false;
+        print(
+            '❌ Error al crear alerta: ${response.statusCode} - ${response.body}');
+        return null;
       }
     } catch (e) {
-      print('Error en crearAlerta: $e');
-      return false;
+      print('❌ Error en crearAlerta: $e');
+      return null;
     }
   }
 
   // Obtener alertas pendientes
   Future<List<Alerta>> obtenerAlertasPendientes() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse(AppConfig.alertasPendientesUrl),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(Duration(seconds: AppConfig.connectionTimeout));
+      final response = await http.get(
+        Uri.parse(AppConfig.alertasPendientesUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: AppConfig.connectionTimeout));
 
       if (response.statusCode == 200) {
         final List<dynamic> body = jsonDecode(response.body);
@@ -135,12 +147,10 @@ class AlertaService {
   // Métodos para gestión administrativa de alertas
   Future<List<Alerta>> obtenerTodasLasAlertas() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.alertasUrl}/admin/todas'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(Duration(seconds: AppConfig.connectionTimeout));
+      final response = await http.get(
+        Uri.parse('${AppConfig.alertasUrl}/admin/todas'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: AppConfig.connectionTimeout));
 
       if (response.statusCode == 200) {
         final List<dynamic> body = jsonDecode(response.body);

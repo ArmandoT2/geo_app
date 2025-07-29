@@ -1,18 +1,36 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
+
 class NotificationService {
-  final String baseUrl =
-      'http://localhost:3000/api/notification'; // Ajusta a tu IP local o dominio
+  String get baseUrl => '${AppConfig.baseUrl}/api/notification';
 
   Future<List<dynamic>> getUltimasNotificaciones() async {
-    final response = await http.get(Uri.parse(baseUrl));
+    try {
+      print('🔍 Intentando obtener notificaciones desde: $baseUrl');
+      final response = await http.get(
+        Uri.parse(baseUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 10));
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['notificaciones'];
-    } else {
-      throw Exception('Error al obtener notificaciones');
+      print('📡 Respuesta del servidor: ${response.statusCode}');
+      print('📄 Cuerpo de respuesta: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final notificaciones = data['notificaciones'] as List<dynamic>;
+        print('✅ Notificaciones obtenidas: ${notificaciones.length}');
+        return notificaciones;
+      } else {
+        print(
+            '❌ Error del servidor: ${response.statusCode} - ${response.body}');
+        throw Exception('Error del servidor: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error en getUltimasNotificaciones: $e');
+      throw Exception('Error al obtener notificaciones: $e');
     }
   }
 

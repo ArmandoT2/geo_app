@@ -1,6 +1,9 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
+import '../config/app_config.dart';
 
 class ReportesAlertasScreen extends StatefulWidget {
   @override
@@ -27,6 +30,7 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
   final List<String> _rangosFecha = ['Todos', 'Últimos 7 días', 'Último mes'];
   final List<String> _generos = ['Todos', 'masculino', 'femenino'];
   List<String> _usuarios = ['Todos'];
+  Map<String, Map<String, dynamic>> _usuariosInfo = {};
 
   @override
   void initState() {
@@ -37,7 +41,7 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
   Future<void> _obtenerAlertas() async {
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/api/alertas'),
+        Uri.parse(AppConfig.alertasUrl),
       );
 
       print('📥 Código respuesta: ${response.statusCode}');
@@ -47,17 +51,47 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         final data = json.decode(response.body);
         final alertas = data['alertas'];
 
-        // Extraer usuarios únicos por ID
-        final creadosPor =
-            alertas
-                .map((a) => a['usuarioCreador'])
-                .where((id) => id != null)
-                .toSet()
-                .toList();
+        // Extraer usuarios únicos con información completa
+        final Map<String, Map<String, dynamic>> usuariosMap = {};
+
+        for (var alerta in alertas) {
+          final usuarioCreador = alerta['usuarioCreador'];
+          if (usuarioCreador != null) {
+            String usuarioId;
+            String usuarioNombre = 'Usuario';
+            String usuarioEmail = '';
+
+            // Si es un objeto con información completa
+            if (usuarioCreador is Map) {
+              usuarioId = usuarioCreador['_id']?.toString() ??
+                  usuarioCreador.toString();
+              usuarioNombre = usuarioCreador['nombre'] ?? 'Usuario';
+              usuarioEmail = usuarioCreador['email'] ?? '';
+            }
+            // Si es directamente un ID string
+            else {
+              usuarioId = usuarioCreador.toString();
+            }
+
+            // Almacenar información del usuario
+            if (!usuariosMap.containsKey(usuarioId)) {
+              usuariosMap[usuarioId] = {
+                'id': usuarioId,
+                'nombre': usuarioNombre,
+                'email': usuarioEmail,
+              };
+            }
+          }
+        }
 
         setState(() {
           _alertas = alertas;
-          _usuarios = ['Todos', ...creadosPor.map((e) => e.toString())];
+          _usuarios = ['Todos', ...usuariosMap.keys.toList()];
+          _usuariosInfo = usuariosMap;
+          // Asegurar que el filtro actual esté en la lista
+          if (!_usuarios.contains(_filtroUsuario)) {
+            _filtroUsuario = 'Todos';
+          }
           _loading = false;
         });
       } else {
@@ -78,9 +112,20 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         return false;
 
       // Usuario
-      if (_filtroUsuario != 'Todos' &&
-          alerta['usuarioCreador'] != _filtroUsuario)
-        return false;
+      if (_filtroUsuario != 'Todos') {
+        final usuarioCreador = alerta['usuarioCreador'];
+        String usuarioId;
+
+        if (usuarioCreador is Map && usuarioCreador.containsKey('_id')) {
+          usuarioId = usuarioCreador['_id'].toString();
+        } else if (usuarioCreador is String) {
+          usuarioId = usuarioCreador;
+        } else {
+          usuarioId = usuarioCreador?.toString() ?? '';
+        }
+
+        if (usuarioId != _filtroUsuario) return false;
+      }
 
       // Fecha
       if (_filtroFecha != 'Todos') {
@@ -107,7 +152,8 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         if (creador is Map && creador.containsKey('genero')) {
           if (creador['genero'] != _filtroGenero) return false;
         } else {
-          return false; // si no tiene género, no lo mostramos al filtrar
+          // Si no tiene datos de género, solo filtramos si el filtro no es "Todos"
+          return false;
         }
       }
 
@@ -115,12 +161,79 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
     }).toList();
   }
 
+  Widget _buildUsuarioDropdownItem(String usuario) {
+    if (usuario == 'Todos') {
+      return Row(
+        children: [
+          Icon(Icons.people, color: Colors.blue, size: 20),
+          SizedBox(width: 8),
+          Text(
+            'Todos los usuarios',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.blue.shade700,
+            ),
+          ),
+        ],
+      );
+    }
+
+    final usuarioInfo = _usuariosInfo[usuario];
+    final nombre = usuarioInfo?['nombre'] ?? 'Usuario';
+    final email = usuarioInfo?['email'] ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.person, color: Colors.grey.shade600, size: 18),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                nombre,
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        if (email.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(left: 26),
+            child: Text(
+              email,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        if (email.isEmpty)
+          Padding(
+            padding: EdgeInsets.only(left: 26),
+            child: Text(
+              'ID: ${usuario.length > 15 ? usuario.substring(0, 15) + '...' : usuario}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildAlertaCard(dynamic alerta) {
     final creador = alerta['usuarioCreador'];
     final genero =
         (creador is Map) ? creador['genero'] ?? 'No definido' : 'No definido';
-    final creadorId =
-        (creador is Map) ? creador['_id'] ?? '' : creador?.toString();
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -141,114 +254,257 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
   }
 
   Widget _buildFiltros() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _filtroEstado,
-                items:
-                    _estados.map((estado) {
-                      return DropdownMenuItem(
-                        value: estado,
-                        child: Text('Estado: $estado'),
-                      );
-                    }).toList(),
-                onChanged: (value) => setState(() => _filtroEstado = value!),
-              ),
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Filtros de Búsqueda',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade700,
             ),
-            SizedBox(width: 8),
-            Expanded(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _filtroFecha,
-                items:
-                    _rangosFecha.map((rango) {
-                      return DropdownMenuItem(
-                        value: rango,
-                        child: Text('Fecha: $rango'),
-                      );
-                    }).toList(),
-                onChanged: (value) => setState(() => _filtroFecha = value!),
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDropdownField(
+                  label: 'Estado',
+                  value: _filtroEstado,
+                  items: _estados,
+                  onChanged: (value) => setState(() => _filtroEstado = value!),
+                  icon: Icons.flag,
+                ),
               ),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _filtroUsuario,
-                items:
-                    _usuarios.map((usuario) {
-                      return DropdownMenuItem(
-                        value: usuario,
-                        child: Text(
-                          usuario == 'Todos'
-                              ? 'Todos los usuarios'
-                              : 'Usuario ID: $usuario',
+              SizedBox(width: 12),
+              Expanded(
+                child: _buildDropdownField(
+                  label: 'Período',
+                  value: _filtroFecha,
+                  items: _rangosFecha,
+                  onChanged: (value) => setState(() => _filtroFecha = value!),
+                  icon: Icons.calendar_today,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.people, color: Colors.blue, size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'Usuario',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _filtroUsuario,
+                          icon: Icon(Icons.arrow_drop_down, color: Colors.blue),
+                          items: _usuarios.map((usuario) {
+                            return DropdownMenuItem(
+                              value: usuario,
+                              child: _buildUsuarioDropdownItem(usuario),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null && _usuarios.contains(value)) {
+                              setState(() => _filtroUsuario = value);
+                            }
+                          },
                         ),
-                      );
-                    }).toList(),
-                onChanged: (value) => setState(() => _filtroUsuario = value!),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _filtroGenero,
-                items:
-                    _generos.map((genero) {
-                      return DropdownMenuItem(
-                        value: genero,
-                        child: Text(
-                          genero == 'Todos'
-                              ? 'Todos los géneros'
-                              : 'Género: $genero',
-                        ),
-                      );
-                    }).toList(),
-                onChanged: (value) => setState(() => _filtroGenero = value!),
+              SizedBox(width: 12),
+              Expanded(
+                child: _buildDropdownField(
+                  label: 'Género',
+                  value: _filtroGenero,
+                  items: _generos,
+                  onChanged: (value) => setState(() => _filtroGenero = value!),
+                  icon: Icons.person_outline,
+                ),
               ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String value,
+    required List<String> items,
+    required Function(String?) onChanged,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: Colors.blue, size: 16),
+              SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: value,
+              icon: Icon(Icons.arrow_drop_down, color: Colors.blue),
+              items: items.map((item) {
+                return DropdownMenuItem(
+                  value: item,
+                  child: Text(
+                    item == 'Todos' ? 'Todos' : item,
+                    style: TextStyle(fontSize: 14),
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Reporte de Alertas')),
-      body:
-          _loading
-              ? Center(child: CircularProgressIndicator())
-              : _alertas.isEmpty
-              ? Center(child: Text('No hay alertas registradas.'))
-              : Column(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: Text(
+          'Reporte de Alertas',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: Colors.blue.shade700,
+        elevation: 0,
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
+      body: _loading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: _buildFiltros(),
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
                   ),
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: _obtenerAlertas,
-                      child: ListView.builder(
-                        itemCount: _filtrarAlertas().length,
-                        itemBuilder:
-                            (context, index) =>
-                                _buildAlertaCard(_filtrarAlertas()[index]),
-                      ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Cargando reportes...',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 16,
                     ),
                   ),
                 ],
               ),
+            )
+          : _alertas.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.assignment_outlined,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'No hay alertas registradas',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Las alertas aparecerán aquí cuando se registren',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: _buildFiltros(),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _obtenerAlertas,
+                        color: Colors.blue,
+                        child: ListView.builder(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filtrarAlertas().length,
+                          itemBuilder: (context, index) =>
+                              _buildAlertaCard(_filtrarAlertas()[index]),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
     );
   }
 }

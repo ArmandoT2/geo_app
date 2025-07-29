@@ -55,7 +55,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final user = data['user'];
         if (user != null) {
-          final userId = user['_id'];
+          // Obtener el ID del usuario (puede venir como 'id' o '_id')
+          final userId = user['id'] ?? user['_id'];
           if (userId != null) {
             await prefs.setString('userId', userId);
           }
@@ -180,20 +181,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     backgroundColor: Colors.blue,
                     textStyle: TextStyle(fontSize: 16),
                   ),
-                  child:
-                      _isLoading
-                          ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : Text(
-                            'Ingresar',
-                            style: TextStyle(color: Colors.white),
+                  child: _isLoading
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
                           ),
+                        )
+                      : Text(
+                          'Ingresar',
+                          style: TextStyle(color: Colors.white),
+                        ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -204,8 +204,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Text('¿No tienes cuenta? Regístrate'),
               ),
               TextButton(
-                onPressed:
-                    () => Navigator.pushNamed(context, '/change-password'),
+                onPressed: () =>
+                    Navigator.pushNamed(context, '/forgot-password'),
                 child: Text('¿Olvidaste tu contraseña?'),
               ),
             ],

@@ -58,169 +58,335 @@ class _AlertaListScreenState extends State<AlertaListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Mis Alertas')),
-      body: Stack(
-        children: [
-          // CONTENIDO PRINCIPAL: Lista de alertas
-          FutureBuilder<List<Alerta>>(
-            future: _alertasFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
-                return Center(child: CircularProgressIndicator());
-              if (snapshot.hasError)
-                return Center(child: Text('Error: ${snapshot.error}'));
-
-              final alertas = snapshot.data!;
-              if (alertas.isEmpty) {
-                return Center(child: Text('No hay alertas registradas'));
-              }
-
-              return ListView.builder(
-                // Agregamos padding inferior para evitar que el último elemento quede oculto detrás del botón
-                padding: EdgeInsets.only(bottom: 80),
-                itemCount: alertas.length,
-                itemBuilder: (context, index) {
-                  final alerta = alertas[index];
-                  return Card(
-                    margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      title: Text(
-                        alerta.detalle.isNotEmpty
-                            ? alerta.detalle
-                            : 'Sin detalle',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 6),
-                          Text(
-                            'Estado: ${alerta.status.isNotEmpty ? alerta.status : 'desconocido'}',
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Fecha: ${alerta.fechaHora.toLocal().toString().split(".")[0]}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                      trailing: ElevatedButton(
-                        child: Text('Ver Seguimiento'),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => AlertaTrackingScreen(alerta: alerta),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  );
-                },
-              );
+      appBar: AppBar(
+        title: Text('Mis Alertas'),
+        backgroundColor: Colors.red[700],
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: () {
+              setState(() {
+                _alertasFuture =
+                    AlertaService().obtenerAlertasPorUsuario(widget.userId);
+              });
             },
+            tooltip: 'Actualizar alertas',
           ),
-
-          // BOTÓN PERSONALIZADO: Posicionado en la parte inferior centrada
-          Positioned(
-            // Posicionamos el botón a 16px del fondo de la pantalla
-            bottom: 16,
-            // Centramos horizontalmente usando left y right
-            left: 20,
-            right: 20,
-            child: Center(
-              child: AnimatedContainer(
-                // Contenedor animado para efectos de hover/press
-                duration: Duration(milliseconds: 200),
-                child: Material(
-                  // Material para poder usar InkWell y obtener efectos visuales
-                  borderRadius: BorderRadius.circular(30),
-                  elevation:
-                      6, // Sombra para simular elevación del FloatingActionButton
-                  child: InkWell(
-                    // InkWell proporciona el efecto de ondas (ripple effect) al tocar
-                    borderRadius: BorderRadius.circular(30),
-                    onTap: _navegarAFormularioAlerta,
-                    // Efecto hover para cambiar la elevación (solo en web/desktop)
-                    onHover: (isHovering) {
-                      // Este setState crea un micro-rebuild para el efecto hover
-                      setState(() {
-                        // El efecto se maneja visualmente por el InkWell
-                      });
-                    },
-                    child: Container(
-                      // Contenedor principal del botón
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        // Gradiente para hacer el botón más atractivo
-                        gradient: LinearGradient(
-                          colors: [
-                            Theme.of(context).primaryColor,
-                            Theme.of(context).primaryColor.withOpacity(0.8),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(30),
-                        // Sombra adicional para profundidad
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(
-                              context,
-                            ).primaryColor.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize:
-                            MainAxisSize.min, // El botón se ajusta al contenido
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Ícono de alerta para complementar el texto
-                          Icon(Icons.add_alert, color: Colors.white, size: 24),
-                          SizedBox(width: 12), // Espacio entre ícono y texto
-                          // Texto principal del botón
-                          Text(
-                            'Generar Alerta',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing:
-                                  0.5, // Espaciado entre letras para mejor legibilidad
-                            ),
-                          ),
-                        ],
-                      ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Banner informativo
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              border: Border(
+                bottom: BorderSide(color: Colors.blue[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue[700]),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Aquí puedes ver todas tus alertas y hacer seguimiento en tiempo real',
+                    style: TextStyle(
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-              ),
+              ],
+            ),
+          ),
+
+          // Lista de alertas
+          Expanded(
+            child: FutureBuilder<List<Alerta>>(
+              future: _alertasFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: Colors.red[700]),
+                        SizedBox(height: 16),
+                        Text('Cargando tus alertas...'),
+                      ],
+                    ),
+                  );
+                if (snapshot.hasError)
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        SizedBox(height: 16),
+                        Text('Error: ${snapshot.error}'),
+                        SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _alertasFuture = AlertaService()
+                                  .obtenerAlertasPorUsuario(widget.userId);
+                            });
+                          },
+                          child: Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                final alertas = snapshot.data!;
+                if (alertas.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.notifications_off_outlined,
+                          size: 80,
+                          color: Colors.grey[400],
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No tienes alertas registradas',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Cuando crees una alerta de emergencia,\naparecerá aquí para hacer seguimiento',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey[500]),
+                        ),
+                        SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _navegarAFormularioAlerta,
+                          icon: Icon(Icons.add_alert),
+                          label: Text('Crear Primera Alerta'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red[700],
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: EdgeInsets.all(8),
+                  itemCount: alertas.length,
+                  itemBuilder: (context, index) {
+                    final alerta = alertas[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AlertaTrackingScreen(alerta: alerta),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Header con estado
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _getStatusColor(alerta.status),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      _getStatusText(alerta.status),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Spacer(),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 16,
+                                    color: Colors.grey[400],
+                                  ),
+                                ],
+                              ),
+
+                              SizedBox(height: 12),
+
+                              // Descripción de la alerta
+                              Text(
+                                alerta.detalle.isNotEmpty
+                                    ? alerta.detalle
+                                    : 'Sin descripción',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+
+                              SizedBox(height: 8),
+
+                              // Fecha y ubicación
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    alerta.fechaHora
+                                        .toLocal()
+                                        .toString()
+                                        .split(".")[0],
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              SizedBox(height: 4),
+
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    size: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                  SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      alerta.direccion,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              SizedBox(height: 12),
+
+                              // Botón de acción
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => AlertaTrackingScreen(
+                                            alerta: alerta),
+                                      ),
+                                    );
+                                  },
+                                  icon: Icon(Icons.track_changes),
+                                  label: Text('Ver Seguimiento'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue[600],
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _navegarAFormularioAlerta,
+        backgroundColor: Colors.red[700],
+        foregroundColor: Colors.white,
+        icon: Icon(Icons.add_alert),
+        label: Text('Nueva Alerta'),
+      ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pendiente':
+        return Colors.orange;
+      case 'asignado':
+        return Colors.blue;
+      case 'en camino':
+        return Colors.green;
+      case 'atendida':
+        return Colors.grey;
+      case 'cancelada':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'pendiente':
+        return 'PENDIENTE';
+      case 'asignado':
+        return 'ASIGNADO';
+      case 'en camino':
+        return 'EN CAMINO';
+      case 'atendida':
+        return 'ATENDIDA';
+      case 'cancelada':
+        return 'CANCELADA';
+      default:
+        return 'DESCONOCIDO';
+    }
   }
 }

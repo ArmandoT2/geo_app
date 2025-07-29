@@ -43,6 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.pushNamed(context, '/crear-alerta', arguments: userId);
   }
 
+  void _navigateToMisAlertas() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId') ?? '';
+    Navigator.pushNamed(context, '/alertas-list', arguments: userId);
+  }
+
   Widget _buildMenuCard(String title, IconData icon, [VoidCallback? onTap]) {
     return Card(
       elevation: 4,
@@ -95,14 +101,24 @@ class _HomeScreenState extends State<HomeScreen> {
               () => _navigateTo('/notificaciones'),
             ),
           ),
+          _buildMenuCard(
+            'Cambiar Contraseña',
+            Icons.lock_outline,
+            () => _navigateTo('/change-password'),
+          ),
         ];
       case 'ciudadano':
       case 'cliente': // Compatibilidad con usuarios existentes
         return [
           _buildMenuCard(
-            'Creación de Alertas',
+            'Crear Alerta de Emergencia',
             Icons.add_alert,
             _navigateToCrearAlerta,
+          ),
+          _buildMenuCard(
+            'Mis Alertas',
+            Icons.track_changes,
+            _navigateToMisAlertas,
           ),
           _buildMenuCard(
             'Mis Contactos',
@@ -141,23 +157,22 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body:
-          _rol == null
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                children: [
-                  const SizedBox(height: 20),
-                  Center(
-                    child: Image.asset(
-                      'assets/images/logoApp.jpeg',
-                      width: 120,
-                      height: 120,
-                    ),
+      body: _rol == null
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                const SizedBox(height: 20),
+                Center(
+                  child: Image.asset(
+                    'assets/images/logoApp.jpeg',
+                    width: 120,
+                    height: 120,
                   ),
-                  const SizedBox(height: 30),
-                  ..._buildMenuByRole(),
-                ],
-              ),
+                ),
+                const SizedBox(height: 30),
+                ..._buildMenuByRole(),
+              ],
+            ),
     );
   }
 }
