@@ -20,10 +20,29 @@ class AlertaPoliceScreen extends StatefulWidget {
 class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
   late Future<List<Alerta>> _alertasFuture;
   final Map<String, String> _nombresUsuarios = {};
+  final Map<String, MapController> _mapControllers =
+      {}; // Controladores de mapa por alerta
+  String?
+      _alertaIdEspecifica; // ID de alerta específica si se pasa como parámetro
 
   @override
   void initState() {
     super.initState();
+    // La carga de alertas se hará en didChangeDependencies para acceder a los argumentos
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Obtener argumentos de la ruta si existen
+    final arguments = ModalRoute.of(context)?.settings.arguments;
+    if (arguments is Map<String, dynamic>) {
+      _alertaIdEspecifica = arguments['alertaId'];
+      print(
+          '🎯 AlertaPoliceScreen - Alerta específica recibida: $_alertaIdEspecifica');
+    }
+
     _cargarAlertas();
   }
 
@@ -31,13 +50,49 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
     _alertasFuture = _cargarAlertasConNombres();
   }
 
+  @override
+  void dispose() {
+    // Limpiar todos los controladores de mapa
+    _mapControllers.values.forEach((controller) {
+      controller.dispose();
+    });
+    _mapControllers.clear();
+    super.dispose();
+  }
+
   Future<List<Alerta>> _cargarAlertasConNombres() async {
     try {
-      final alertas = await AlertaService().obtenerAlertasPendientes();
+      // Cargar todas las alertas pendientes
+      final todasLasAlertas = await AlertaService().obtenerAlertasPendientes();
+
+      List<Alerta> alertas;
+
+      // Si hay una alerta específica, filtrar por ella
+      if (_alertaIdEspecifica != null && _alertaIdEspecifica!.isNotEmpty) {
+        print('🔍 Filtrando por alerta específica: $_alertaIdEspecifica');
+        alertas = todasLasAlertas
+            .where((alerta) => alerta.id == _alertaIdEspecifica)
+            .toList();
+
+        if (alertas.isEmpty) {
+          print(
+              '⚠️ Alerta específica no encontrada en alertas pendientes, mostrando todas');
+          alertas = todasLasAlertas;
+        } else {
+          print('✅ Alerta específica encontrada');
+        }
+      } else {
+        // Usar todas las alertas pendientes
+        alertas = todasLasAlertas;
+      }
 
       // Debug: Verificar datos de alertas
       print('=== DEBUG ALERTAS POLICÍA ===');
       print('Total alertas obtenidas: ${alertas.length}');
+      if (_alertaIdEspecifica != null) {
+        print('Filtro aplicado para alerta: $_alertaIdEspecifica');
+      }
+
       for (var alerta in alertas) {
         print('Alerta ID: ${alerta.id}');
         print('  - Detalle: ${alerta.detalle}');
@@ -159,28 +214,139 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String titulo =
+        _alertaIdEspecifica != null ? 'Alerta Específica' : 'Atender Alertas';
+
     return Scaffold(
-      appBar: AppBar(title: Text('Atender Alertas')),
+      appBar: AppBar(
+        title: Text(titulo),
+        backgroundColor: _alertaIdEspecifica != null ? Colors.blue[700] : null,
+        foregroundColor: _alertaIdEspecifica != null ? Colors.white : null,
+      ),
       body: FutureBuilder<List<Alerta>>(
         future: _alertasFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
-            return Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
-            return Center(child: Text('Error: ${snapshot.error}'));
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(_alertaIdEspecifica != null
+                      ? 'Cargando alerta específica...'
+                      : 'Cargando alertas...'),
+                ],
+              ),
+            );
+          }
 
-          final alertas = snapshot.data!;
-          if (alertas.isEmpty)
-            return Center(child: Text('No hay alertas pendientes'));
+          if (snapshot.hasError) {
+            print('❌ Error en FutureBuilder: ${snapshot.error}');
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  SizedBox(height: 16),
+                  Text(
+                    'Error al cargar alertas',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final alertas = snapshot.data;
+          if (alertas == null || alertas.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.assignment_outlined, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    _alertaIdEspecifica != null
+                        ? 'Alerta no encontrada'
+                        : 'No hay alertas pendientes',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  if (_alertaIdEspecifica != null) ...[
+                    SizedBox(height: 8),
+                    Text(
+                      'La alerta con ID $_alertaIdEspecifica no está disponible',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(
+                            context, '/atender-alerta');
+                      },
+                      icon: Icon(Icons.list),
+                      label: Text('Ver todas las alertas'),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }
 
           return ListView.builder(
             itemCount: alertas.length,
             itemBuilder: (context, index) {
               final alerta = alertas[index];
+              final bool esAlertaEspecifica = _alertaIdEspecifica != null &&
+                  alerta.id == _alertaIdEspecifica;
+
               return Card(
                 margin: EdgeInsets.all(8),
+                elevation: esAlertaEspecifica ? 8 : 2,
+                color: esAlertaEspecifica ? Colors.blue[50] : null,
+                shape: esAlertaEspecifica
+                    ? RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.blue, width: 2),
+                      )
+                    : null,
                 child: Column(
                   children: [
+                    // Indicador de alerta específica si aplica
+                    if (esAlertaEspecifica)
+                      Container(
+                        width: double.infinity,
+                        padding:
+                            EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[700],
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(10),
+                            topRight: Radius.circular(10),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.push_pin, color: Colors.white, size: 16),
+                            SizedBox(width: 8),
+                            Text(
+                              'Alerta seleccionada desde notificaciones',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     // Información compacta de la alerta
                     Padding(
                       padding: EdgeInsets.all(12),
@@ -286,10 +452,9 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder:
-                                          (context) => RutaAtencionScreen(
-                                            alerta: alerta,
-                                          ),
+                                      builder: (context) => RutaAtencionScreen(
+                                        alerta: alerta,
+                                      ),
                                     ),
                                   );
                                 },
@@ -333,9 +498,8 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder:
-                                        (context) =>
-                                            RutaAtencionScreen(alerta: alerta),
+                                    builder: (context) =>
+                                        RutaAtencionScreen(alerta: alerta),
                                   ),
                                 ).then((_) {
                                   setState(() {
@@ -380,19 +544,12 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
   }
 
   Widget _buildBotonEstadoCompacto(Alerta alerta) {
-    List<String> estados = ['pendiente', 'asignado', 'en camino', 'atendida'];
-    int indexActual = estados.indexOf(alerta.status);
-
-    if (indexActual == -1 || indexActual == estados.length - 1) {
-      return SizedBox(); // Ya está en el último estado
-    }
-
-    String siguienteEstado = estados[indexActual + 1];
-
+    // Para el rol de policía, siempre mostrar el botón "CENTRAR MAPA"
+    // Esto permite que el gendarme pueda centrar el mapa en cualquier momento
     return ElevatedButton(
-      onPressed: () => actualizarEstado(alerta, siguienteEstado),
+      onPressed: () => _centrarMapaEnAlerta(alerta),
       child: Text(
-        _getTextoSiguienteEstado(siguienteEstado),
+        'CENTRAR MAPA',
         style: TextStyle(fontSize: 11),
         textAlign: TextAlign.center,
       ),
@@ -405,23 +562,104 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
     );
   }
 
-  String _getTextoSiguienteEstado(String estado) {
-    switch (estado) {
-      case 'asignado':
-        return 'ASIGNAR';
-      case 'en camino':
-        return 'IR';
-      case 'atendida':
-        return 'ATENDER';
-      default:
-        return estado.toUpperCase();
+  // Función para centrar el mapa en la ubicación de la alerta
+  void _centrarMapaEnAlerta(Alerta alerta) {
+    if (alerta.lat == null || alerta.lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ Esta alerta no tiene coordenadas GPS disponibles'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Verificar que el controlador existe
+    if (_mapControllers.containsKey(alerta.id)) {
+      final mapController = _mapControllers[alerta.id]!;
+
+      try {
+        // Coordenadas exactas del incidente
+        final puntoIncidente = LatLng(alerta.lat!, alerta.lng!);
+
+        print('🎯 Centrando mapa en: Lat: ${alerta.lat}, Lng: ${alerta.lng}');
+
+        // Primero hacer un zoom out y luego centrar con animación suave
+        // Esto asegura que el punto se centre correctamente
+        Future.microtask(() {
+          // Primer movimiento: zoom moderado para preparar
+          mapController.move(puntoIncidente, 14.0);
+
+          // Segundo movimiento después de un pequeño delay: zoom final con centrado preciso
+          Future.delayed(Duration(milliseconds: 300), () {
+            if (mounted) {
+              // Centrado final con zoom moderado que muestre bien el contexto
+              mapController.move(
+                puntoIncidente,
+                15.5, // Zoom más bajo para ver mejor el punto y el contexto alrededor
+              );
+
+              // Forzar otro centrado después de un momento para asegurar precisión
+              Future.delayed(Duration(milliseconds: 400), () {
+                if (mounted) {
+                  mapController.move(puntoIncidente, 15.5);
+                }
+              });
+            }
+          });
+        });
+
+        // Comentado: No mostrar mensaje de confirmación después del centrado
+        /*
+        Future.delayed(Duration(milliseconds: 800), () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.gps_fixed, color: Colors.white),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '🎯 Mapa centrado exactamente en el incidente\n'
+                        'Coordenadas: ${alerta.lat!.toStringAsFixed(6)}, ${alerta.lng!.toStringAsFixed(6)}',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green[600],
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        });
+        */
+      } catch (e) {
+        print('Error al centrar el mapa: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error al centrar el mapa'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Mapa no disponible para centrar'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
   Widget _buildMapaAlerta(Alerta alerta) {
     // Verificar si tenemos coordenadas válidas
-    bool tieneCoordenadasValidas =
-        alerta.lat != null &&
+    bool tieneCoordenadasValidas = alerta.lat != null &&
         alerta.lng != null &&
         alerta.lat != 0 &&
         alerta.lng != 0 &&
@@ -485,6 +723,13 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
       );
     } // Si tenemos coordenadas válidas, mostrar el mapa directamente
     try {
+      // Crear o obtener el controlador de mapa para esta alerta específica
+      if (!_mapControllers.containsKey(alerta.id)) {
+        _mapControllers[alerta.id] = MapController();
+      }
+
+      final mapController = _mapControllers[alerta.id]!;
+
       return Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
@@ -494,13 +739,15 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
           borderRadius: BorderRadius.circular(8),
           child: Stack(
             children: [
-              // Mapa principal con configuración simplificada
+              // Mapa principal con configuración optimizada para ver el incidente
               FlutterMap(
+                mapController: mapController,
                 options: MapOptions(
                   center: LatLng(alerta.lat!, alerta.lng!),
-                  zoom: 15.0,
+                  zoom:
+                      16.5, // Zoom inicial que muestre claramente el punto del incidente
                   minZoom: 8.0,
-                  maxZoom: 18.0,
+                  maxZoom: 17.0, // Reducir más el zoom máximo
                   interactiveFlags: InteractiveFlag.all,
                 ),
                 children: [
@@ -514,41 +761,78 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                   MarkerLayer(
                     markers: [
                       Marker(
-                        width: 60.0,
+                        width:
+                            60.0, // Reducir tamaño para que sea más proporcionado
                         height: 60.0,
                         point: LatLng(alerta.lat!, alerta.lng!),
-                        builder:
-                            (ctx) => Container(
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black26,
-                                          offset: Offset(2, 2),
-                                          blurRadius: 6,
-                                        ),
-                                      ],
-                                    ),
-                                    child: Icon(
-                                      Icons.location_on,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
+                        builder: (ctx) => Container(
+                          // Centrar el marcador exactamente en las coordenadas
+                          alignment: Alignment.center,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Círculo de pulso exterior reducido
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.red.withOpacity(0.3),
+                                    width: 1,
                                   ),
-                                  Container(
-                                    width: 4,
-                                    height: 8,
-                                    color: Colors.red,
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                              // Círculo de fondo principal más pequeño
+                              Container(
+                                width:
+                                    35, // Tamaño similar al de la pantalla izquierda
+                                height: 35,
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black54,
+                                      offset: Offset(2, 2),
+                                      blurRadius: 6,
+                                    ),
+                                    BoxShadow(
+                                      color: Colors.red.withOpacity(0.4),
+                                      offset: Offset(0, 0),
+                                      blurRadius: 12,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.location_on,
+                                  color: Colors.white,
+                                  size: 22, // Icono más pequeño y proporcionado
+                                ),
+                              ),
+                              // Punto central más pequeño
+                              Container(
+                                width: 6, // Punto central del tamaño original
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border:
+                                      Border.all(color: Colors.red, width: 1),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      offset: Offset(1, 1),
+                                      blurRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -571,33 +855,6 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
-                  ),
-                ),
-              ),
-              // Indicador de estado del mapa
-              Positioned(
-                bottom: 8,
-                left: 8,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green[600],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.map, color: Colors.white, size: 12),
-                      SizedBox(width: 4),
-                      Text(
-                        'Mapa OSM',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -688,33 +945,6 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
-              ),
-            ),
-          ),
-          // Indicador de mapa simplificado
-          Positioned(
-            bottom: 8,
-            left: 8,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.orange[600],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_outlined, color: Colors.white, size: 12),
-                  SizedBox(width: 4),
-                  Text(
-                    'Vista simplificada',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
               ),
             ),
           ),

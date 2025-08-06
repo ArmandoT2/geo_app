@@ -62,18 +62,6 @@ class _AlertaListScreenState extends State<AlertaListScreen> {
         title: Text('Mis Alertas'),
         backgroundColor: Colors.red[700],
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {
-                _alertasFuture =
-                    AlertaService().obtenerAlertasPorUsuario(widget.userId);
-              });
-            },
-            tooltip: 'Actualizar alertas',
-          ),
-        ],
       ),
       body: Column(
         children: [

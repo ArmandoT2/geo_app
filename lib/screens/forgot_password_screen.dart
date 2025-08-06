@@ -42,10 +42,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         return;
       }
 
-      if (newPasswordCtrl.text.length < 6) {
+      if (newPasswordCtrl.text.length < 8) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('La contraseña debe tener al menos 6 caracteres')),
+              content: Text('La contraseña debe tener al menos 8 caracteres')),
+        );
+        return;
+      }
+
+      if (!RegExp(r'[A-Z]').hasMatch(newPasswordCtrl.text)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'La contraseña debe tener al menos una letra mayúscula')),
+        );
+        return;
+      }
+
+      if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(newPasswordCtrl.text)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'La contraseña debe tener al menos un carácter especial')),
         );
         return;
       }

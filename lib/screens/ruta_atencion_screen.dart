@@ -16,6 +16,27 @@ import '../services/alerta_service.dart';
 import '../services/location_service.dart';
 import '../widgets/common_widgets.dart';
 
+/*
+ * PANTALLA: ATENDER ALERTA (RutaAtencionScreen)
+ * 
+ * FUNCIONALIDAD PRINCIPAL:
+ * - Centrado automático del mapa en la ubicación del incidente al cargar la pantalla
+ * - Soporte para re-entrada: cuando el gendarme vuelve a entrar a una alerta "en camino"
+ * 
+ * COMPORTAMIENTO ESPERADO:
+ * 1. Al abrir la pantalla, el mapa se centra automáticamente en las coordenadas del incidente
+ * 2. El nivel de zoom por defecto (16.0) muestra claramente el punto y el contexto
+ * 3. NO se requiere ninguna acción manual del usuario para ver la ubicación del incidente
+ * 4. El botón "Centrar" está disponible como backup para centrado manual
+ * 
+ * SOLUCIONES IMPLEMENTADAS:
+ * - Centrado inmediato en initState()
+ * - Centrado en onMapReady() con secuencia de recentrados
+ * - Centrado adicional post-inicialización para casos de re-entrada
+ * - Centrado final de seguridad después de 2 segundos
+ * - Botón de centrado manual mejorado (color naranja, más visible)
+ */
+
 class RutaAtencionScreen extends StatefulWidget {
   final Alerta alerta;
 
@@ -38,7 +59,6 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
   File? _archivoSeleccionado;
   Uint8List? _archivoWebBytes;
   String? _nombreArchivoWeb;
-  String? _urlSubida;
 
   final String cloudName = 'ddkoq06ti';
   final String uploadPreset = 'unsigned';
@@ -56,16 +76,25 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     // Debug: Imprimir información de la alerta en RutaAtencionScreen
     print('=== DEBUG RUTA ATENCION SCREEN ===');
     print('Alerta ID: ${widget.alerta.id}');
+    print('Estado actual: ${widget.alerta.status}');
     print('Dirección (campo original): "${widget.alerta.direccion}"');
     print('Dirección completa (getter): "${widget.alerta.direccionCompleta}"');
-    print('Campos individuales:');
-    print('  * Calle: "${widget.alerta.calle ?? 'null'}"');
-    print('  * Barrio: "${widget.alerta.barrio ?? 'null'}"');
-    print('  * Ciudad: "${widget.alerta.ciudad ?? 'null'}"');
-    print('  * Estado: "${widget.alerta.estado ?? 'null'}"');
-    print('  * País: "${widget.alerta.pais ?? 'null'}"');
-    print('  * Código Postal: "${widget.alerta.codigoPostal ?? 'null'}"');
+    print('Coordenadas: lat=${widget.alerta.lat}, lng=${widget.alerta.lng}');
+    
+    // **DEBUG ESPECÍFICO PARA "EN CAMINO"**
+    if (widget.alerta.status == 'en camino') {
+      print('🚚 ESTADO "EN CAMINO" DETECTADO - Aplicando lógica especial de centrado');
+      print('   -> Se aplicarán delays adicionales para evitar interferencia de rutas');
+      print('   -> Se forzará re-centrado después de generar rutas');
+    }
+    
     print('==============================');
+
+    // **CRÍTICO: Establecer coordenadas de la alerta INMEDIATAMENTE**
+    if (widget.alerta.lat != null && widget.alerta.lng != null) {
+      _ubicacionAlerta = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+      print('🎯 Coordenadas de alerta establecidas inmediatamente: ${_ubicacionAlerta}');
+    }
 
     _inicializarUbicaciones();
     _obtenerInfoUsuarioCreador();
@@ -96,8 +125,35 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
           _cargandoUbicacion = false;
         });
 
-        // Generar ruta entre ambos puntos
-        _generarRuta();
+        // Debug: Verificar coordenadas
+        print('🔍 Coordenadas establecidas:');
+        print('  Alerta: ${widget.alerta.lat}, ${widget.alerta.lng}');
+        print(
+            '  _ubicacionAlerta: ${_ubicacionAlerta?.latitude}, ${_ubicacionAlerta?.longitude}');
+
+        // Centrar inmediatamente el mapa en el punto del incidente al cargar
+        _centrarInicialmenteEnIncidente();
+
+        // **SOLUCIÓN PARA RE-ENTRADA: Centrado adicional después de ubicaciones**
+        // Especialmente importante cuando el gendarme vuelve a entrar a una alerta "en camino"
+        Future.delayed(Duration(milliseconds: 800), () {
+          if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
+            final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+            _mapController.move(puntoIncidente, 16.0);
+            print('🔄 Centrado post-inicialización aplicado para re-entrada');
+          }
+        });
+
+        // **FIX PARA ESTADO "EN CAMINO": Retrasar generación de ruta**
+        // Si está "en camino", retrasar la ruta para no interferir con el centrado
+        int delayRuta = _estadoActual == 'en camino' ? 1500 : 300;
+        print('🗺️ Estado: $_estadoActual - Delay para ruta: ${delayRuta}ms');
+        
+        Future.delayed(Duration(milliseconds: delayRuta), () {
+          if (mounted) {
+            _generarRuta();
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -108,6 +164,34 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
             widget.alerta.lng ?? -77.0428,
           );
           _cargandoUbicacion = false;
+        });
+
+        // Debug: Verificar coordenadas en caso de error
+        print('🔍 Coordenadas establecidas (fallback):');
+        print('  Alerta: ${widget.alerta.lat}, ${widget.alerta.lng}');
+        print(
+            '  _ubicacionAlerta: ${_ubicacionAlerta?.latitude}, ${_ubicacionAlerta?.longitude}');
+
+        // Centrar inmediatamente el mapa en el punto del incidente al cargar (fallback)
+        _centrarInicialmenteEnIncidente();
+
+        // **SOLUCIÓN PARA RE-ENTRADA: Centrado adicional para fallback**
+        Future.delayed(Duration(milliseconds: 800), () {
+          if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
+            final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+            _mapController.move(puntoIncidente, 16.0);
+            print('🔄 Centrado post-fallback aplicado para re-entrada');
+          }
+        });
+
+        // **FIX PARA ESTADO "EN CAMINO": Retrasar generación de ruta en fallback**
+        int delayRuta = _estadoActual == 'en camino' ? 1500 : 300;
+        print('🗺️ Estado (fallback): $_estadoActual - Delay para ruta: ${delayRuta}ms');
+        
+        Future.delayed(Duration(milliseconds: delayRuta), () {
+          if (mounted) {
+            _generarRuta();
+          }
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +268,20 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
               _cargandoRuta = false;
             });
 
-            _ajustarVistaDelMapa();
+            // **IMPLEMENTACIÓN DEL REQUERIMIENTO: Centrado automático en incidente**
+            // NO llamar a _ajustarVistaDelMapa() automáticamente aquí
+            // para mantener el centro en el incidente, que es el comportamiento deseado
+            
+            // **FIX ADICIONAL PARA "EN CAMINO": Re-centrar después de obtener ruta OSRM**
+            if (_estadoActual == 'en camino') {
+              Future.delayed(Duration(milliseconds: 500), () {
+                if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
+                  final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+                  _mapController.move(puntoIncidente, 16.0);
+                  print('🎯 Re-centrado post-ruta OSRM para estado "en camino"');
+                }
+              });
+            }
 
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -255,7 +352,9 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
               _cargandoRuta = false;
             });
 
-            _ajustarVistaDelMapa();
+            // **IMPLEMENTACIÓN DEL REQUERIMIENTO: Centrado automático en incidente**
+            // NO llamar a _ajustarVistaDelMapa() automáticamente aquí
+            // para mantener el centro en el incidente, que es el comportamiento deseado
 
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -292,7 +391,20 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
       _cargandoRuta = false;
     });
 
-    _ajustarVistaDelMapa();
+    // **IMPLEMENTACIÓN DEL REQUERIMIENTO: Centrado automático en incidente**
+    // NO llamar a _ajustarVistaDelMapa() automáticamente aquí
+    // para mantener el centro en el incidente, que es el comportamiento deseado
+    
+    // **FIX ADICIONAL PARA "EN CAMINO": Re-centrar después de ruta directa**
+    if (_estadoActual == 'en camino') {
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
+          final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+          _mapController.move(puntoIncidente, 16.0);
+          print('🎯 Re-centrado post-ruta directa para estado "en camino"');
+        }
+      });
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -306,47 +418,271 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     }
   }
 
-  void _ajustarVistaDelMapa() {
-    if (!mounted || _ubicacionPolicia == null || _ubicacionAlerta == null)
+  // Función específica para centrar el mapa en el punto del incidente (llamada por botón)
+  void _centrarEnIncidente() {
+    if (!mounted || _ubicacionAlerta == null) return;
+
+    // Verificar que tenemos coordenadas válidas
+    if (widget.alerta.lat == null || widget.alerta.lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ Esta alerta no tiene coordenadas GPS disponibles'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
       return;
-
-    // Si tenemos puntos de ruta, calcular bounds para todos
-    List<LatLng> puntosParaBounds = _puntosRuta.isNotEmpty
-        ? _puntosRuta
-        : [_ubicacionPolicia!, _ubicacionAlerta!];
-
-    if (puntosParaBounds.length < 2) return;
-
-    // Encontrar los límites de todos los puntos
-    double minLat =
-        puntosParaBounds.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-    double maxLat =
-        puntosParaBounds.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-    double minLng = puntosParaBounds
-        .map((p) => p.longitude)
-        .reduce((a, b) => a < b ? a : b);
-    double maxLng = puntosParaBounds
-        .map((p) => p.longitude)
-        .reduce((a, b) => a > b ? a : b);
-
-    // Agregar margen
-    double margenLat = (maxLat - minLat) * 0.1;
-    double margenLng = (maxLng - minLng) * 0.1;
-
-    // Centrar el mapa en el punto medio
-    final centro = LatLng((minLat + maxLat) / 2, (minLng + maxLng) / 2);
-
-    // Calcular zoom apropiado basado en la distancia
-    double deltaLat = maxLat - minLat + margenLat;
-    double deltaLng = maxLng - minLng + margenLng;
-    double zoom = 15 - (deltaLat + deltaLng) * 30; // Fórmula aproximada
-    zoom = zoom.clamp(10.0, 18.0); // Limitar zoom entre 10 y 18
+    }
 
     try {
-      _mapController.move(centro, zoom);
+      // Coordenadas exactas del incidente
+      final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+
+      print(
+          '🎯 Centrando mapa manualmente en incidente (botón): Lat: ${widget.alerta.lat}, Lng: ${widget.alerta.lng}');
+
+      // Proceso de centrado secuencial para asegurar precisión
+      Future.microtask(() {
+        // Primer movimiento: zoom moderado para preparar
+        _mapController.move(puntoIncidente, 14.0);
+
+        // Segundo movimiento después de un pequeño delay: zoom final con centrado preciso
+        Future.delayed(Duration(milliseconds: 300), () {
+          if (mounted) {
+            // Centrado final con zoom cómodo que muestre bien el punto
+            _mapController.move(
+              puntoIncidente,
+              15.5, // Zoom más bajo para ver mejor el punto y el contexto
+            );
+
+            // Forzar otro centrado después de un momento para asegurar precisión
+            Future.delayed(Duration(milliseconds: 400), () {
+              if (mounted) {
+                _mapController.move(puntoIncidente, 15.5);
+              }
+            });
+          }
+        });
+      });
+
+      // Comentado: No mostrar mensaje de confirmación después del centrado
+      /*
+      Future.delayed(Duration(milliseconds: 800), () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.gps_fixed, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '🎯 Mapa centrado exactamente en el incidente\n'
+                      'Coordenadas: ${widget.alerta.lat!.toStringAsFixed(6)}, ${widget.alerta.lng!.toStringAsFixed(6)}',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green[600],
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      });
+      */
     } catch (e) {
-      // Ignorar errores si el mapa no está listo
-      print('Error al mover el mapa: $e');
+      print('Error al centrar en el incidente: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error al centrar el mapa'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  // Función para centrar el mapa inicialmente en el punto del incidente sin mostrar mensaje
+  void _centrarInicialmenteEnIncidente() {
+    if (!mounted || _ubicacionAlerta == null) return;
+
+    // Verificar que tenemos coordenadas válidas
+    if (widget.alerta.lat == null || widget.alerta.lng == null) {
+      return; // No mostrar mensaje en el centrado inicial
+    }
+
+    try {
+      // Coordenadas exactas del incidente
+      final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+
+      print(
+          '🎯 Centrando mapa inicialmente en incidente (sin mensaje): Lat: ${widget.alerta.lat}, Lng: ${widget.alerta.lng}');
+
+      // Centrado inmediato para asegurar que esté en el incidente desde el primer momento
+      _mapController.move(puntoIncidente, 16.0);
+
+      // Proceso de centrado secuencial mejorado para mayor precisión
+      Future.delayed(Duration(milliseconds: 200), () {
+        if (mounted) {
+          _mapController.move(puntoIncidente, 15.8);
+
+          Future.delayed(Duration(milliseconds: 300), () {
+            if (mounted) {
+              _mapController.move(puntoIncidente, 16.0);
+
+              // Centrado final para asegurar precisión máxima
+              Future.delayed(Duration(milliseconds: 400), () {
+                if (mounted) {
+                  _mapController.move(puntoIncidente, 16.0);
+                }
+              });
+            }
+          });
+        }
+      });
+    } catch (e) {
+      print('Error al centrar inicialmente en el incidente: $e');
+    }
+  }
+
+  // Nueva función optimizada para centrar el mapa cuando está listo
+  void _centrarMapaInicial() async {
+    print('🗺️ Mapa listo - iniciando centrado optimizado en el incidente');
+    print('📍 Estado de la alerta: ${_estadoActual}');
+
+    if (!mounted || widget.alerta.lat == null || widget.alerta.lng == null) {
+      print('❌ No se puede centrar: coordenadas no disponibles');
+      return;
+    }
+
+    final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+    print(
+        '🎯 Centrando automáticamente en incidente: ${puntoIncidente.latitude}, ${puntoIncidente.longitude}');
+
+    try {
+      // **SOLUCIÓN PARA RE-ENTRADA: Centrado inmediato y múltiple**
+      // Centrado inmediato sin delay (especialmente importante para re-entrada)
+      _mapController.move(puntoIncidente, 16.0);
+      print('🚀 Centrado inmediato aplicado');
+
+      // Secuencia de recentrados más agresiva para re-entrada
+      final secuenciaCentrado = [
+        {'delay': 50, 'zoom': 16.0},   // Muy rápido
+        {'delay': 150, 'zoom': 15.8},  // Ligero zoom out
+        {'delay': 300, 'zoom': 16.0},  // Zoom de vuelta
+        {'delay': 500, 'zoom': 16.0},  // Confirmación
+        {'delay': 800, 'zoom': 16.0},  // Asegurar
+        {'delay': 1200, 'zoom': 16.0}, // Final
+      ];
+
+      for (var config in secuenciaCentrado) {
+        Future.delayed(Duration(milliseconds: config['delay'] as int), () {
+          if (mounted) {
+            _mapController.move(puntoIncidente, config['zoom'] as double);
+            print('🔄 Recentrado en incidente - delay ${config['delay']}ms, zoom ${config['zoom']}');
+          }
+        });
+      }
+
+      // Mostrar mensaje de confirmación específico según el estado
+      String mensaje = _estadoActual == 'en camino' 
+          ? '🎯 Regresando al incidente - Mapa centrado automáticamente'
+          : '🎯 Mapa centrado automáticamente en el incidente';
+
+      Future.delayed(Duration(milliseconds: 1400), () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.gps_fixed, color: Colors.white, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      mensaje,
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: _estadoActual == 'en camino' ? Colors.green[600] : Colors.blue[600],
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      });
+
+      print('✅ Secuencia de centrado automático en incidente iniciada (estado: $_estadoActual)');
+    } catch (e) {
+      print('❌ Error en centrado automático inicial: $e');
+    }
+  }
+
+  // Función combinada que obtiene la ubicación GPS y calcula la ruta automáticamente
+  Future<void> _obtenerRutaConGPS() async {
+    if (!mounted) return;
+
+    setState(() {
+      _cargandoRuta = true;
+    });
+
+    try {
+      // Primero obtener la ubicación actual (GPS)
+      final ubicacionActual = await LocationService.getCurrentLocation();
+
+      if (ubicacionActual != null && mounted) {
+        setState(() {
+          _ubicacionPolicia = ubicacionActual;
+        });
+
+        // Mostrar mensaje de confirmación de GPS
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.gps_fixed, color: Colors.white),
+                SizedBox(width: 8),
+                Text('📍 Ubicación GPS actualizada'),
+              ],
+            ),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Luego calcular la ruta automáticamente
+        await _obtenerRutaReal();
+      } else {
+        if (mounted) {
+          setState(() {
+            _cargandoRuta = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ No se pudo obtener la ubicación GPS'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error obteniendo ubicación GPS: $e');
+      if (mounted) {
+        setState(() {
+          _cargandoRuta = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error al obtener ubicación GPS'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -645,12 +981,6 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
         title: Text('Atender Alerta'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _inicializarUbicaciones,
-          ),
-        ],
       ),
       body: _cargandoUbicacion
           ? LoadingWidget(message: 'Obteniendo ubicaciones...')
@@ -919,109 +1249,211 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                 Container(
                                   height: constraints.maxHeight *
                                       0.75, // Aumentado a 75% para un mapa más grande
-                                  child: FlutterMap(
-                                    mapController: _mapController,
-                                    options: MapOptions(
-                                      center: _ubicacionPolicia ??
-                                          LatLng(-12.0464, -77.0428),
-                                      zoom: 13,
-                                    ),
+                                  child: Stack(
                                     children: [
-                                      TileLayer(
-                                        urlTemplate: AppConfig.mapTileUrl,
-                                        subdomains: AppConfig.mapSubdomains,
-                                        userAgentPackageName:
-                                            'com.example.geo_app',
-                                        retinaMode: true,
-                                        maxZoom: 19,
-                                      ),
-                                      if (_puntosRuta.isNotEmpty)
-                                        PolylineLayer(
-                                          polylines: [
-                                            Polyline(
-                                              points: _puntosRuta,
-                                              strokeWidth: 5.0,
-                                              color: Colors.blue[700]!,
-                                              borderStrokeWidth: 2.0,
-                                              borderColor: Colors.white,
-                                            ),
-                                          ],
+                                      FlutterMap(
+                                        mapController: _mapController,
+                                        options: MapOptions(
+                                          center: LatLng(
+                                          widget.alerta.lat ?? -12.0464,
+                                          widget.alerta.lng ?? -77.0428),
+                                          zoom:
+                                          16, // Zoom inicial centrado en el incidente desde el primer momento
+                                          onMapReady: () {
+                                          // Centrar inmediatamente cuando el mapa esté listo
+                            _centrarMapaInicial();
+                            print('📍 Mapa listo - aplicando centrado automático en incidente');
+                            
+                            // **SOLUCIÓN ADICIONAL PARA RE-ENTRADA**
+                            // Centrado final después de que todo esté completamente listo
+                            Future.delayed(Duration(milliseconds: 2000), () {
+                              if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
+                                final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+                                _mapController.move(puntoIncidente, 16.0);
+                                print('🎆 Centrado final de seguridad aplicado para re-entrada');
+                              }
+                            });
+                          },
+                                          // Configuración para mantener el centrado en el incidente
+                                          keepAlive: true,
+                                          // Permitir interacción pero mantener foco en el incidente
+                                          interactiveFlags: InteractiveFlag.all,
+                                          // Zoom mínimo y máximo apropiados para visualizar el incidente
+                                          minZoom: 12.0,
+                                          maxZoom: 18.0,
                                         ),
-                                      MarkerLayer(
-                                        markers: [
-                                          if (_ubicacionPolicia != null)
-                                            Marker(
-                                              point: _ubicacionPolicia!,
-                                              builder: (ctx) => Column(
-                                                children: [
-                                                  Icon(
-                                                    Icons.local_police,
-                                                    color: Colors.blue,
-                                                    size: 40,
-                                                  ),
-                                                  Container(
-                                                    padding:
-                                                        EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                      vertical: 2,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.blue,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                        4,
-                                                      ),
-                                                    ),
-                                                    child: Text(
-                                                      'POLICÍA',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                        children: [
+                                          TileLayer(
+                                            urlTemplate: AppConfig.mapTileUrl,
+                                            subdomains: AppConfig.mapSubdomains,
+                                            userAgentPackageName:
+                                                'com.example.geo_app',
+                                            retinaMode: true,
+                                            maxZoom:
+                                                17, // Reducir zoom máximo para evitar problemas
+                                            // Ocultar la atribución "Mapa OSM"
+                                            tileProvider: NetworkTileProvider(),
+                                          ),
+                                          if (_puntosRuta.isNotEmpty)
+                                            PolylineLayer(
+                                              polylines: [
+                                                Polyline(
+                                                  points: _puntosRuta,
+                                                  strokeWidth: 5.0,
+                                                  color: Colors.blue[700]!,
+                                                  borderStrokeWidth: 2.0,
+                                                  borderColor: Colors.white,
+                                                ),
+                                              ],
                                             ),
-                                          if (_ubicacionAlerta != null)
-                                            Marker(
-                                              point: _ubicacionAlerta!,
-                                              builder: (ctx) => Column(
-                                                children: [
-                                                  Icon(
-                                                    Icons.emergency,
-                                                    color: Colors.red,
-                                                    size: 40,
-                                                  ),
-                                                  Container(
-                                                    padding:
-                                                        EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                      vertical: 2,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.red,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                        4,
+                                          MarkerLayer(
+                                            markers: [
+                                              if (_ubicacionPolicia != null)
+                                                Marker(
+                                                  point: _ubicacionPolicia!,
+                                                  builder: (ctx) => Column(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.local_police,
+                                                        color: Colors.blue,
+                                                        size: 40,
                                                       ),
-                                                    ),
-                                                    child: Text(
-                                                      'EMERGENCIA',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.bold,
+                                                      Container(
+                                                        padding: EdgeInsets
+                                                            .symmetric(
+                                                          horizontal: 4,
+                                                          vertical: 2,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: Colors.blue,
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(
+                                                            4,
+                                                          ),
+                                                        ),
+                                                        child: Text(
+                                                          'POLICÍA',
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
                                                       ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              if (_ubicacionAlerta != null)
+                                                Marker(
+                                                  width: 60.0,
+                                                  height: 60.0,
+                                                  point: _ubicacionAlerta!,
+                                                  builder: (ctx) => Container(
+                                                    alignment: Alignment.center,
+                                                    child: Stack(
+                                                      alignment:
+                                                          Alignment.center,
+                                                      children: [
+                                                        // Marcador principal con sombra
+                                                        Container(
+                                                          width: 50,
+                                                          height: 50,
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: Colors.red,
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: Colors
+                                                                    .black54,
+                                                                offset: Offset(
+                                                                    2, 2),
+                                                                blurRadius: 6,
+                                                              ),
+                                                              BoxShadow(
+                                                                color: Colors
+                                                                    .red
+                                                                    .withOpacity(
+                                                                        0.4),
+                                                                offset: Offset(
+                                                                    0, 0),
+                                                                blurRadius: 12,
+                                                                spreadRadius: 2,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          child: Icon(
+                                                            Icons.emergency,
+                                                            color: Colors.white,
+                                                            size: 30,
+                                                          ),
+                                                        ),
+                                                        // Punto central exacto
+                                                        Container(
+                                                          width: 6,
+                                                          height: 6,
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: Colors.white,
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            border: Border.all(
+                                                                color:
+                                                                    Colors.red,
+                                                                width: 1),
+                                                          ),
+                                                        ),
+                                                        // Etiqueta inferior
+                                                        Positioned(
+                                                          bottom: -5,
+                                                          child: Container(
+                                                            padding: EdgeInsets
+                                                                .symmetric(
+                                                              horizontal: 4,
+                                                              vertical: 2,
+                                                            ),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: Colors.red,
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          4),
+                                                            ),
+                                                            child: Text(
+                                                              'EMERGENCIA',
+                                                              style: TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontSize: 9,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                ],
-                                              ),
-                                            ),
+                                                ),
+                                            ],
+                                          ),
                                         ],
+                                      ),
+                                      // Overlay para ocultar completamente cualquier atribución
+                                      Positioned(
+                                        bottom: 0,
+                                        left: 0,
+                                        child: Container(
+                                          width: 120,
+                                          height: 30,
+                                          color: Colors.white.withOpacity(0.9),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1041,14 +1473,30 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                 Row(
                                   children: [
                                     Expanded(
+                                      flex: 1,
                                       child: ElevatedButton.icon(
                                         onPressed: _actualizandoEstado ||
                                                 _cargandoRuta ||
                                                 !mounted
                                             ? null
                                             : () {
-                                                if (mounted)
-                                                  _ajustarVistaDelMapa();
+                                                if (mounted) {
+                                                  _centrarEnIncidente();
+                                                  // Mostrar mensaje de confirmación mejorado
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Row(
+                                                        children: [
+                                                          Icon(Icons.center_focus_strong, color: Colors.white, size: 16),
+                                                          SizedBox(width: 8),
+                                                          Text('🎯 Centrando manualmente en el incidente'),
+                                                        ],
+                                                      ),
+                                                      backgroundColor: Colors.orange[600],
+                                                      duration: Duration(seconds: 2),
+                                                    ),
+                                                  );
+                                                }
                                               },
                                         icon: Icon(
                                           Icons.center_focus_strong,
@@ -1056,7 +1504,7 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                         ),
                                         label: Text('Centrar'),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.grey[600],
+                                          backgroundColor: Colors.orange[600], // Color más visible
                                           foregroundColor: Colors.white,
                                           padding: EdgeInsets.symmetric(
                                             horizontal: 4,
@@ -1068,29 +1516,7 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                     ),
                                     SizedBox(width: 8),
                                     Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: _actualizandoEstado ||
-                                                _cargandoRuta ||
-                                                !mounted
-                                            ? null
-                                            : () {
-                                                if (mounted) _obtenerRutaReal();
-                                              },
-                                        icon: Icon(Icons.route, size: 16),
-                                        label: Text('Ruta'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green[600],
-                                          foregroundColor: Colors.white,
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                            vertical: 8,
-                                          ),
-                                          minimumSize: Size(0, 36),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Expanded(
+                                      flex: 2,
                                       child: ElevatedButton.icon(
                                         onPressed: _actualizandoEstado ||
                                                 _cargandoRuta ||
@@ -1098,15 +1524,24 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                             ? null
                                             : () {
                                                 if (mounted)
-                                                  _inicializarUbicaciones();
+                                                  _obtenerRutaConGPS();
                                               },
-                                        icon: Icon(
-                                          Icons.my_location,
-                                          size: 16,
-                                        ),
-                                        label: Text('GPS'),
+                                        icon: _cargandoRuta
+                                            ? SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  color: Colors.white,
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            : Icon(Icons.route, size: 16),
+                                        label: Text(_cargandoRuta
+                                            ? 'Calculando...'
+                                            : 'GPS + Ruta'),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.blue[600],
+                                          backgroundColor: Colors.green[600],
                                           foregroundColor: Colors.white,
                                           padding: EdgeInsets.symmetric(
                                             horizontal: 4,

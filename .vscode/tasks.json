@@ -12,9 +12,18 @@
 			],
 			"group": "build",
 			"isBackground": false,
-			"problemMatcher": [
-				"$dart-flutter"
-			]
+			"problemMatcher": []
+		},
+		{
+			"label": "Flutter Run",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"run"
+			],
+			"group": "build",
+			"isBackground": true,
+			"problemMatcher": []
 		}
 	]
 }

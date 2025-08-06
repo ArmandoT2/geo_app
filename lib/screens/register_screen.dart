@@ -17,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController fullNameCtrl = TextEditingController();
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passwordCtrl = TextEditingController();
+  final TextEditingController confirmPasswordCtrl = TextEditingController();
   final TextEditingController phoneCtrl = TextEditingController();
   final TextEditingController addressCtrl = TextEditingController();
 
@@ -235,13 +236,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   labelText: 'Contraseña',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.lock),
+                  helperText:
+                      'Mínimo 8 caracteres, una mayúscula y un carácter especial',
+                  helperMaxLines: 2,
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'La contraseña es requerida';
                   }
-                  if (value.length < 6) {
-                    return 'La contraseña debe tener al menos 6 caracteres';
+                  if (value.length < 8) {
+                    return 'La contraseña debe tener al menos 8 caracteres';
+                  }
+                  if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                    return 'La contraseña debe tener al menos una letra mayúscula';
+                  }
+                  if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
+                    return 'La contraseña debe tener al menos un carácter especial';
+                  }
+                  return null;
+                },
+                onChanged: (value) {
+                  // Revalidar el campo de confirmación cuando cambie la contraseña
+                  if (confirmPasswordCtrl.text.isNotEmpty) {
+                    _formKey.currentState?.validate();
+                  }
+                },
+              ),
+              SizedBox(height: 16),
+
+              TextFormField(
+                controller: confirmPasswordCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Confirmar contraseña',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock_reset),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Por favor confirma la contraseña';
+                  }
+                  if (value != passwordCtrl.text) {
+                    return 'Las contraseñas no coinciden';
                   }
                   return null;
                 },
@@ -360,25 +396,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child:
-                      _isLoading
-                          ? CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                            'Registrarse',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                  child: _isLoading
+                      ? CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                          'Registrarse',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
+                        ),
                 ),
               ),
               SizedBox(height: 16),
 
               // Link para ir al login
               TextButton(
-                onPressed:
-                    () => Navigator.pushReplacementNamed(context, '/login'),
+                onPressed: () =>
+                    Navigator.pushReplacementNamed(context, '/login'),
                 child: Text('¿Ya tienes cuenta? Inicia sesión'),
               ),
             ],

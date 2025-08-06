@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user_model.dart';
 import '../services/user_service.dart';
+import '../widgets/flutter_map_address_picker.dart';
 
 class EditarPerfilScreen extends StatefulWidget {
   final User usuario;
@@ -166,105 +167,110 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
             ),
         ],
       ),
-      body:
-          _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Información no editable
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Información de cuenta',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Información no editable
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Información de cuenta',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              SizedBox(height: 12),
-                              _buildReadOnlyField(
-                                'Usuario',
-                                widget.usuario.username,
-                              ),
-                              _buildReadOnlyField(
-                                'Email',
-                                widget.usuario.email,
-                              ),
+                            ),
+                            SizedBox(height: 12),
+                            _buildReadOnlyField(
+                              'Usuario',
+                              widget.usuario.username,
+                            ),
+                            _buildReadOnlyField(
+                              'Email',
+                              widget.usuario.email,
+                            ),
+                            // Solo mostrar el rol si no es ciudadano
+                            if (widget.usuario.rol != 'ciudadano')
                               _buildReadOnlyField('Rol', widget.usuario.rol),
-                            ],
-                          ),
+                          ],
                         ),
                       ),
+                    ),
 
-                      SizedBox(height: 16),
+                    SizedBox(height: 16),
 
-                      // Formulario editable
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Información personal',
-                                style: TextStyle(
-                                  fontSize: 18,
+                    // Formulario editable
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Información personal',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            TextFormField(
+                              controller: _fullNameController,
+                              decoration: InputDecoration(
+                                labelText: 'Nombre completo',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.person),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Por favor ingrese su nombre completo';
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 16),
+                            TextFormField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              decoration: InputDecoration(
+                                labelText: 'Teléfono',
+                                hintText: '0987654321 (10 dígitos)',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.phone),
+                                prefixText: '+593 ',
+                                prefixStyle: TextStyle(
+                                  color: Colors.blue,
                                   fontWeight: FontWeight.bold,
                                 ),
+                                helperText: 'Ingrese el número con 0 inicial',
+                                helperStyle: TextStyle(fontSize: 12),
                               ),
-                              SizedBox(height: 16),
-
-                              TextFormField(
-                                controller: _fullNameController,
-                                decoration: InputDecoration(
-                                  labelText: 'Nombre completo',
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.person),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Por favor ingrese su nombre completo';
-                                  }
-                                  return null;
+                              validator: _validatePhoneNumber,
+                            ),
+                            SizedBox(height: 16),
+                            // Campo de dirección condicional basado en el rol
+                            if (widget.usuario.rol == 'ciudadano')
+                              FlutterMapAddressPicker(
+                                initialAddress: _addressController.text,
+                                onAddressSelected: (address) {
+                                  _addressController.text = address;
                                 },
-                              ),
-
-                              SizedBox(height: 16),
-
-                              TextFormField(
-                                controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(10),
-                                ],
-                                decoration: InputDecoration(
-                                  labelText: 'Teléfono',
-                                  hintText: '0987654321 (10 dígitos)',
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.phone),
-                                  prefixText: '+593 ',
-                                  prefixStyle: TextStyle(
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  helperText: 'Ingrese el número con 0 inicial',
-                                  helperStyle: TextStyle(fontSize: 12),
-                                ),
-                                validator: _validatePhoneNumber,
-                              ),
-
-                              SizedBox(height: 16),
-
+                              )
+                            else
                               TextFormField(
                                 controller: _addressController,
                                 maxLines: 2,
@@ -274,43 +280,42 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                                   prefixIcon: Icon(Icons.location_on),
                                 ),
                               ),
-                            ],
-                          ),
+                          ],
                         ),
                       ),
+                    ),
 
-                      SizedBox(height: 32),
+                    SizedBox(height: 32),
 
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _guardarCambios,
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child:
-                              _isLoading
-                                  ? Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                      SizedBox(width: 12),
-                                      Text('Guardando...'),
-                                    ],
-                                  )
-                                  : Text('Actualizar Información'),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _guardarCambios,
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 16),
                         ),
+                        child: _isLoading
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text('Guardando...'),
+                                ],
+                              )
+                            : Text('Actualizar Información'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
     );
   }
 

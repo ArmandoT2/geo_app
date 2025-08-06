@@ -103,11 +103,85 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     Navigator.pushNamed(context, '/atender-alerta');
   }
 
-  void _navegarAAlertaEspecifica(String? alertaId) {
-    if (alertaId != null) {
-      // Navegar directamente a la pantalla de atender alertas
-      // En una implementación más avanzada, podrías filtrar por alerta específica
-      _navegarAAtenderAlertas();
+  void _navegarAAlertaEspecifica(dynamic alertaData) {
+    try {
+      print('📱 _navegarAAlertaEspecifica llamado con: $alertaData');
+      print('📱 Tipo de datos: ${alertaData.runtimeType}');
+
+      if (alertaData != null) {
+        // Extraer el ID de la alerta del objeto o string
+        String? alertaId;
+
+        if (alertaData is String) {
+          alertaId = alertaData;
+          print('📱 Alerta ID como string: $alertaId');
+        } else if (alertaData is Map<String, dynamic>) {
+          // Intentar múltiples campos posibles para el ID
+          alertaId = alertaData['_id'] ??
+              alertaData['id'] ??
+              alertaData['alertaId'] ??
+              alertaData['objectId'];
+          print('📱 Alerta ID desde mapa: $alertaId');
+          print('📱 Campos disponibles en mapa: ${alertaData.keys.toList()}');
+        } else {
+          print(
+              '⚠️ Tipo de datos no reconocido para alerta: ${alertaData.runtimeType}');
+        }
+
+        if (alertaId != null && alertaId.isNotEmpty) {
+          print('🎯 Navegando a alerta específica con ID: $alertaId');
+
+          // Navegar a la pantalla de atender alertas con el ID específico
+          Navigator.pushNamed(context, '/atender-alerta',
+              arguments: {'alertaId': alertaId}).then((_) {
+            print('✅ Navegación completada exitosamente');
+          }).catchError((error) {
+            print('❌ Error al navegar a alerta específica: $error');
+            // Mostrar mensaje de error al usuario
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('❌ Error al abrir la alerta'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            }
+            // Como fallback, navegar a la pantalla general
+            _navegarAAtenderAlertas();
+            return null; // Retorno requerido para catchError
+          });
+        } else {
+          print('⚠️ No se pudo extraer ID válido de la alerta');
+          // Si no hay ID válido, navegar a la pantalla general
+          _navegarAAtenderAlertas();
+        }
+      } else {
+        print('⚠️ alertaData es null');
+        // Si no hay datos de alerta, navegar a la pantalla general
+        _navegarAAtenderAlertas();
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error crítico en _navegarAAlertaEspecifica: $e');
+      print('❌ Stack trace: $stackTrace');
+
+      // Mostrar error al usuario
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error al procesar la alerta'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // En caso de error crítico, navegar a la pantalla general como fallback
+      try {
+        _navegarAAtenderAlertas();
+      } catch (e2) {
+        print('❌ Error incluso en el fallback: $e2');
+      }
     }
   }
 
@@ -174,11 +248,6 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
         backgroundColor: Colors.red[700],
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _cargarNotificaciones,
-            tooltip: 'Actualizar notificaciones',
-          ),
           if (userRole == 'policia')
             IconButton(
               icon: Icon(Icons.list_alt),
@@ -287,7 +356,30 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       color: esLeida ? Colors.grey[100] : Colors.white,
       child: InkWell(
-        onTap: () => _navegarAAlertaEspecifica(notificacion['alerta']),
+        onTap: () {
+          // Mostrar indicador de carga mientras se navega
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                content: Row(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(width: 16),
+                    Text('Abriendo alerta...'),
+                  ],
+                ),
+              );
+            },
+          );
+
+          // Navegar después de un breve delay para mostrar el indicador
+          Future.delayed(Duration(milliseconds: 500), () {
+            Navigator.of(context).pop(); // Cerrar el indicador
+            _navegarAAlertaEspecifica(notificacion['alerta']);
+          });
+        },
         child: Padding(
           padding: EdgeInsets.all(12),
           child: Row(

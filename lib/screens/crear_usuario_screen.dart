@@ -14,6 +14,7 @@ class _CrearUsuarioScreenState extends State<CrearUsuarioScreen> {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
 
@@ -133,7 +134,66 @@ class _CrearUsuarioScreenState extends State<CrearUsuarioScreen> {
               _campo(_usernameController, 'Username'),
               _campo(_fullNameController, 'Nombre Completo'),
               _campo(_emailController, 'Email', TextInputType.emailAddress),
-              _campo(_passwordController, 'Contraseña', TextInputType.text),
+
+              // Campo específico para contraseña con validaciones
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextFormField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña',
+                    border: OutlineInputBorder(),
+                    helperText:
+                        'Mínimo 8 caracteres, una mayúscula y un carácter especial',
+                    helperMaxLines: 2,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'La contraseña es requerida';
+                    }
+                    if (value.length < 8) {
+                      return 'La contraseña debe tener al menos 8 caracteres';
+                    }
+                    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                      return 'La contraseña debe tener al menos una letra mayúscula';
+                    }
+                    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
+                      return 'La contraseña debe tener al menos un carácter especial';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    // Revalidar el campo de confirmación cuando cambie la contraseña
+                    if (_confirmPasswordController.text.isNotEmpty) {
+                      _formKey.currentState?.validate();
+                    }
+                  },
+                ),
+              ),
+
+              // Campo de confirmación de contraseña
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Confirmar contraseña',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_reset),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Por favor confirma la contraseña';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Las contraseñas no coinciden';
+                    }
+                    return null;
+                  },
+                ),
+              ),
 
               // Campo especial para teléfono con formato ecuatoriano
               Padding(
@@ -205,13 +265,12 @@ class _CrearUsuarioScreenState extends State<CrearUsuarioScreen> {
                     labelText: 'Rol del usuario',
                     border: OutlineInputBorder(),
                   ),
-                  items:
-                      roles.map((role) {
-                        return DropdownMenuItem<String>(
-                          value: role['value'],
-                          child: Text(role['label']!),
-                        );
-                      }).toList(),
+                  items: roles.map((role) {
+                    return DropdownMenuItem<String>(
+                      value: role['value'],
+                      child: Text(role['label']!),
+                    );
+                  }).toList(),
                   onChanged: (String? newValue) {
                     setState(() {
                       selectedRol = newValue!;
@@ -249,9 +308,8 @@ class _CrearUsuarioScreenState extends State<CrearUsuarioScreen> {
         controller: controller,
         keyboardType: inputType,
         obscureText: obscureText,
-        validator:
-            (value) =>
-                value == null || value.isEmpty ? 'Campo requerido' : null,
+        validator: (value) =>
+            value == null || value.isEmpty ? 'Campo requerido' : null,
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(),

@@ -92,12 +92,53 @@ class _GestionUsuariosScreenState extends State<GestionUsuariosScreen> {
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  // Métodos helper para los roles
+  Color _getRolColor(String rol) {
+    switch (rol.toLowerCase()) {
+      case 'administrador':
+        return Colors.red;
+      case 'policia':
+        return Colors.blue;
+      case 'ciudadano':
+      case 'cliente': // Para compatibilidad con usuarios antiguos
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getRolIcon(String rol) {
+    switch (rol.toLowerCase()) {
+      case 'administrador':
+        return Icons.admin_panel_settings;
+      case 'policia':
+        return Icons.security;
+      case 'ciudadano':
+      case 'cliente': // Para compatibilidad con usuarios antiguos
+        return Icons.person;
+      default:
+        return Icons.help;
+    }
+  }
+
+  String _getRolDisplayName(String rol) {
+    switch (rol.toLowerCase()) {
+      case 'administrador':
+        return 'Administrador';
+      case 'policia':
+        return 'Policía';
+      case 'ciudadano':
+        return 'Ciudadano';
+      case 'cliente': // Para compatibilidad con usuarios antiguos
+        return 'Ciudadano';
+      default:
+        return rol.isNotEmpty ? rol : 'Sin rol';
     }
   }
 
@@ -112,35 +153,72 @@ class _GestionUsuariosScreenState extends State<GestionUsuariosScreen> {
       body: _loading
           ? Center(child: CircularProgressIndicator())
           : _usuarios.isEmpty
-              ? Center(child: Text('No hay usuarios registrados'))
-              : ListView.builder(
-                  itemCount: _usuarios.length,
-                  itemBuilder: (context, index) {
-                    final u = _usuarios[index];
-                    return Card(
-                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: ListTile(
-                        title: Text(u.fullName),
-                        subtitle: Text(u.email),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () => _irEditarUsuario(u),
-                              tooltip: 'Editar usuario',
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _eliminarUsuario(u),
-                              tooltip: 'Eliminar usuario',
-                            ),
-                          ],
-                        ),
+          ? Center(child: Text('No hay usuarios registrados'))
+          : ListView.builder(
+              itemCount: _usuarios.length,
+              itemBuilder: (context, index) {
+                final u = _usuarios[index];
+                return Card(
+                  margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: _getRolColor(u.rol),
+                      child: Icon(
+                        _getRolIcon(u.rol),
+                        color: Colors.white,
+                        size: 20,
                       ),
-                    );
-                  },
-                ),
+                    ),
+                    title: Text(u.fullName),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(u.email),
+                        SizedBox(height: 4),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getRolColor(u.rol).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _getRolColor(u.rol).withOpacity(0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            _getRolDisplayName(u.rol),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _getRolColor(u.rol).withOpacity(0.8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    isThreeLine: true,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.edit, color: Colors.blue),
+                          onPressed: () => _irEditarUsuario(u),
+                          tooltip: 'Editar usuario',
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _eliminarUsuario(u),
+                          tooltip: 'Eliminar usuario',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }

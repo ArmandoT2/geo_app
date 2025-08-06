@@ -178,9 +178,6 @@ class _ContactosScreenState extends State<ContactosScreen> {
         title: Text('Mis Contactos'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(icon: Icon(Icons.refresh), onPressed: _cargarContactos),
-        ],
       ),
       body: Column(
         children: [

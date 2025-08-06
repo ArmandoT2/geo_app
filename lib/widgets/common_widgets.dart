@@ -5,7 +5,7 @@ class LoadingWidget extends StatelessWidget {
   final double size;
 
   const LoadingWidget({Key? key, this.message = 'Cargando...', this.size = 60})
-    : super(key: key);
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -75,10 +75,9 @@ class EmptyStateWidget extends StatelessWidget {
             ),
             if (onRefresh != null) ...[
               SizedBox(height: 20),
-              ElevatedButton.icon(
+              ElevatedButton(
                 onPressed: onRefresh,
-                icon: Icon(Icons.refresh),
-                label: Text('Actualizar'),
+                child: Text('Actualizar'),
               ),
             ],
           ],
@@ -127,10 +126,9 @@ class CustomErrorWidget extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               SizedBox(height: 20),
-              ElevatedButton.icon(
+              ElevatedButton(
                 onPressed: onRetry,
-                icon: Icon(Icons.refresh),
-                label: Text('Reintentar'),
+                child: Text('Reintentar'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,

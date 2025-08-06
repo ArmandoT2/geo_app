@@ -195,9 +195,7 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
                   strokeWidth: 2,
                 ),
               ),
-            )
-          else
-            IconButton(icon: Icon(Icons.refresh), onPressed: _actualizarAlerta),
+            ),
         ],
       ),
       body: Column(
@@ -336,8 +334,7 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                center:
-                    _ubicacionAlerta ??
+                center: _ubicacionAlerta ??
                     LatLng(
                       _alertaActual.lat ?? -12.0464,
                       _alertaActual.lng ?? -77.0428,
@@ -387,72 +384,70 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
                     if (_ubicacionAlerta != null)
                       Marker(
                         point: _ubicacionAlerta!,
-                        builder:
-                            (ctx) => Container(
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.emergency,
-                                    color: Colors.red,
-                                    size: 40,
-                                  ),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'TU UBICACIÓN',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                        builder: (ctx) => Container(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.emergency,
+                                color: Colors.red,
+                                size: 40,
                               ),
-                            ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'TU UBICACIÓN',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
 
                     // Marcador del policía si existe ruta
                     if (_ubicacionPolicia != null)
                       Marker(
                         point: _ubicacionPolicia!,
-                        builder:
-                            (ctx) => Container(
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.local_police,
-                                    color: Colors.blue,
-                                    size: 40,
-                                  ),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'POLICÍA',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                        builder: (ctx) => Container(
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.local_police,
+                                color: Colors.blue,
+                                size: 40,
                               ),
-                            ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'POLICÍA',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -460,48 +455,38 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
             ),
           ),
 
-          // Botones de acción
-          if (_alertaActual.rutaAtencion != null)
-            Container(
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _cargandoRuta || !mounted
-                              ? null
-                              : () {
-                                if (mounted) _ajustarVistaDelMapa();
-                              },
-                      icon: Icon(Icons.center_focus_strong),
-                      label: Text('Centrar Ruta'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[600],
-                        foregroundColor: Colors.white,
-                      ),
+          // Botones de acción - Siempre visibles
+          Container(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _cargandoRuta || !mounted
+                        ? null
+                        : () {
+                            if (mounted) {
+                              if (_alertaActual.rutaAtencion != null) {
+                                _ajustarVistaDelMapa();
+                              } else {
+                                // Si no hay ruta, centrar en la ubicación de la alerta
+                                _centrarEnAlerta();
+                              }
+                            }
+                          },
+                    icon: Icon(Icons.center_focus_strong),
+                    label: Text(_alertaActual.rutaAtencion != null
+                        ? 'Centrar Ruta'
+                        : 'Centrar Alerta'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[600],
+                      foregroundColor: Colors.white,
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed:
-                          _cargandoRuta || !mounted
-                              ? null
-                              : () {
-                                if (mounted) _actualizarAlerta();
-                              },
-                      icon: Icon(Icons.refresh),
-                      label: Text('Actualizar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[600],
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -576,15 +561,13 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
 
     try {
       // OSRM Demo Server (gratuito)
-      final String url =
-          'http://router.project-osrm.org/route/v1/driving/' +
+      final String url = 'http://router.project-osrm.org/route/v1/driving/' +
           '${_ubicacionPolicia!.longitude},${_ubicacionPolicia!.latitude};' +
           '${_ubicacionAlerta!.longitude},${_ubicacionAlerta!.latitude}' +
           '?overview=full&geometries=geojson';
 
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(Duration(seconds: 10));
+      final response =
+          await http.get(Uri.parse(url)).timeout(Duration(seconds: 10));
 
       if (!mounted) return false;
 
@@ -597,10 +580,9 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
 
           if (mounted) {
             setState(() {
-              _puntosRuta =
-                  coordinates.map<LatLng>((coord) {
-                    return LatLng(coord[1].toDouble(), coord[0].toDouble());
-                  }).toList();
+              _puntosRuta = coordinates.map<LatLng>((coord) {
+                return LatLng(coord[1].toDouble(), coord[0].toDouble());
+              }).toList();
 
               _distanciaRuta =
                   (route['distance'] / 1000).toDouble(); // Convertir a km
@@ -662,16 +644,14 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
 
           if (mounted) {
             setState(() {
-              _puntosRuta =
-                  coordinates.map<LatLng>((coord) {
-                    return LatLng(coord[1].toDouble(), coord[0].toDouble());
-                  }).toList();
+              _puntosRuta = coordinates.map<LatLng>((coord) {
+                return LatLng(coord[1].toDouble(), coord[0].toDouble());
+              }).toList();
 
               _distanciaRuta =
                   (properties['distance'] / 1000).toDouble(); // Convertir a km
-              _tiempoEstimado =
-                  (properties['duration'] / 60)
-                      .toDouble(); // Convertir a minutos
+              _tiempoEstimado = (properties['duration'] / 60)
+                  .toDouble(); // Convertir a minutos
               _cargandoRuta = false;
             });
 
@@ -713,20 +693,17 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
       return;
 
     // Si tenemos puntos de ruta, calcular bounds para todos
-    List<LatLng> puntosParaBounds =
-        _puntosRuta.isNotEmpty
-            ? _puntosRuta
-            : [_ubicacionPolicia!, _ubicacionAlerta!];
+    List<LatLng> puntosParaBounds = _puntosRuta.isNotEmpty
+        ? _puntosRuta
+        : [_ubicacionPolicia!, _ubicacionAlerta!];
 
     if (puntosParaBounds.length < 2) return;
 
     // Encontrar los límites de todos los puntos
-    double minLat = puntosParaBounds
-        .map((p) => p.latitude)
-        .reduce((a, b) => a < b ? a : b);
-    double maxLat = puntosParaBounds
-        .map((p) => p.latitude)
-        .reduce((a, b) => a > b ? a : b);
+    double minLat =
+        puntosParaBounds.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    double maxLat =
+        puntosParaBounds.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
     double minLng = puntosParaBounds
         .map((p) => p.longitude)
         .reduce((a, b) => a < b ? a : b);
@@ -755,6 +732,18 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
     }
   }
 
+  void _centrarEnAlerta() {
+    if (!mounted || _ubicacionAlerta == null) return;
+
+    try {
+      // Centrar el mapa en la ubicación de la alerta con un zoom apropiado
+      _mapController.move(_ubicacionAlerta!, 16.0);
+    } catch (e) {
+      // Ignorar errores si el mapa no está listo
+      print('Error al centrar en la alerta: $e');
+    }
+  }
+
   Future<String> _obtenerDireccionDesdeCoordenadas() async {
     if (_alertaActual.lat == null || _alertaActual.lng == null) {
       return 'Ubicación no disponible';
@@ -762,17 +751,15 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
 
     try {
       // Usar servicio de geocodificación reversa para obtener dirección legible
-      final String url =
-          'https://nominatim.openstreetmap.org/reverse'
+      final String url = 'https://nominatim.openstreetmap.org/reverse'
           '?format=json'
           '&lat=${_alertaActual.lat}'
           '&lon=${_alertaActual.lng}'
           '&addressdetails=1'
           '&accept-language=es';
 
-      final response = await http
-          .get(Uri.parse(url), headers: {'User-Agent': 'GeoApp/1.0'})
-          .timeout(Duration(seconds: 5));
+      final response = await http.get(Uri.parse(url),
+          headers: {'User-Agent': 'GeoApp/1.0'}).timeout(Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -1029,12 +1016,10 @@ class _AlertaTrackingScreenState extends State<AlertaTrackingScreen> {
     if (policiaId.isEmpty) return;
 
     try {
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.baseUrl}/usuarios/$policiaId'),
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(Duration(seconds: 5));
+      final response = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/usuarios/$policiaId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

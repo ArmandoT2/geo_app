@@ -216,4 +216,59 @@ class AlertaService {
       return false;
     }
   }
+
+  Future<bool> cancelarAlerta(String alertaId) async {
+    try {
+      print('🚫 Intentando cancelar alerta: $alertaId');
+      print('URL: ${AppConfig.alertasUrl}/$alertaId/cancelar');
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.alertasUrl}/$alertaId/cancelar'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: AppConfig.connectionTimeout));
+
+      print('📱 Respuesta del servidor:');
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        print('✅ Alerta cancelada exitosamente');
+
+        // Verificar si la respuesta tiene el formato esperado
+        try {
+          final Map<String, dynamic> jsonResponse = json.decode(response.body);
+          print('📄 Respuesta parseada: $jsonResponse');
+
+          if (jsonResponse.containsKey('mensaje') ||
+              jsonResponse.containsKey('alerta')) {
+            return true;
+          } else {
+            print('⚠️ Respuesta no tiene el formato esperado');
+            return true; // Asumir éxito si el status code es 200
+          }
+        } catch (jsonError) {
+          print('⚠️ Error parseando JSON, pero status code es 200: $jsonError');
+          return true; // Asumir éxito si el status code es 200
+        }
+      } else {
+        print('❌ Error al cancelar alerta: ${response.statusCode}');
+        print('❌ Cuerpo de respuesta: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error en cancelarAlerta: $e');
+      print('❌ Tipo de error: ${e.runtimeType}');
+
+      // Proporcionar más detalles del error
+      if (e.toString().contains('SocketException')) {
+        print('❌ Error de conexión: No se puede conectar al servidor');
+      } else if (e.toString().contains('TimeoutException')) {
+        print('❌ Error de timeout: El servidor no respondió a tiempo');
+      } else if (e.toString().contains('FormatException')) {
+        print('❌ Error de formato: Respuesta del servidor malformada');
+      }
+
+      return false;
+    }
+  }
 }

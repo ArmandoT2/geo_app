@@ -51,35 +51,64 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         final data = json.decode(response.body);
         final alertas = data['alertas'];
 
-        // Extraer usuarios únicos con información completa
-        final Map<String, Map<String, dynamic>> usuariosMap = {};
+        // Debug: imprimir primera alerta para entender la estructura
+        if (alertas.isNotEmpty) {
+          print('📋 Estructura de primera alerta: ${alertas[0]}');
+          if (alertas[0]['usuarioCreador'] != null) {
+            print(
+                '👤 Estructura de usuarioCreador: ${alertas[0]['usuarioCreador']}');
+          }
+        }
 
+        // Extraer usuarios únicos y obtener información completa
+        final Map<String, Map<String, dynamic>> usuariosMap = {};
+        final Set<String> usuarioIds = {};
+
+        // Primero, recopilar todos los IDs de usuarios únicos
         for (var alerta in alertas) {
           final usuarioCreador = alerta['usuarioCreador'];
           if (usuarioCreador != null) {
             String usuarioId;
-            String usuarioNombre = 'Usuario';
-            String usuarioEmail = '';
 
-            // Si es un objeto con información completa
             if (usuarioCreador is Map) {
               usuarioId = usuarioCreador['_id']?.toString() ??
                   usuarioCreador.toString();
-              usuarioNombre = usuarioCreador['nombre'] ?? 'Usuario';
-              usuarioEmail = usuarioCreador['email'] ?? '';
-            }
-            // Si es directamente un ID string
-            else {
+            } else {
               usuarioId = usuarioCreador.toString();
             }
 
-            // Almacenar información del usuario
+            if (usuarioId.isNotEmpty) {
+              usuarioIds.add(usuarioId);
+            }
+          }
+        }
+
+        // Ahora obtener información de usuarios desde el endpoint de usuarios
+        await _obtenerInformacionUsuarios(usuarioIds.toList(), usuariosMap);
+
+        // También procesar información de usuarios que venga en las alertas
+        for (var alerta in alertas) {
+          final usuarioCreador = alerta['usuarioCreador'];
+          if (usuarioCreador != null && usuarioCreador is Map) {
+            String usuarioId =
+                usuarioCreador['_id']?.toString() ?? usuarioCreador.toString();
+
+            // Solo usar esta información si no tenemos mejor información del endpoint de usuarios
             if (!usuariosMap.containsKey(usuarioId)) {
+              String usuarioNombre = usuarioCreador['fullName'] ??
+                  usuarioCreador['nombre'] ??
+                  usuarioCreador['username'] ??
+                  'Usuario ${usuarioId.substring(0, 8)}';
+              String usuarioEmail = usuarioCreador['email'] ?? '';
+
               usuariosMap[usuarioId] = {
                 'id': usuarioId,
                 'nombre': usuarioNombre,
                 'email': usuarioEmail,
               };
+
+              print(
+                  '👤 Usuario de alerta: ID=$usuarioId, Nombre=$usuarioNombre');
             }
           }
         }
@@ -102,6 +131,45 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _obtenerInformacionUsuarios(List<String> usuarioIds,
+      Map<String, Map<String, dynamic>> usuariosMap) async {
+    try {
+      // Hacer llamada al endpoint de usuarios para obtener información completa
+      final response = await http.get(
+        Uri.parse(AppConfig.usuariosUrl),
+      );
+
+      if (response.statusCode == 200) {
+        final usuarios = json.decode(response.body);
+
+        if (usuarios is List) {
+          for (var usuario in usuarios) {
+            String usuarioId = usuario['_id']?.toString() ?? '';
+
+            if (usuarioIds.contains(usuarioId)) {
+              String usuarioNombre = usuario['fullName'] ??
+                  usuario['nombre'] ??
+                  usuario['username'] ??
+                  'Usuario ${usuarioId.substring(0, 8)}';
+              String usuarioEmail = usuario['email'] ?? '';
+
+              usuariosMap[usuarioId] = {
+                'id': usuarioId,
+                'nombre': usuarioNombre,
+                'email': usuarioEmail,
+              };
+
+              print(
+                  '👤 Usuario completo: ID=$usuarioId, Nombre=$usuarioNombre, Email=$usuarioEmail');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ Error al obtener información de usuarios: $e');
     }
   }
 
@@ -164,14 +232,19 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
   Widget _buildUsuarioDropdownItem(String usuario) {
     if (usuario == 'Todos') {
       return Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.people, color: Colors.blue, size: 20),
-          SizedBox(width: 8),
-          Text(
-            'Todos los usuarios',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Colors.blue.shade700,
+          Icon(Icons.people, color: Colors.blue, size: 18),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Todos los usuarios',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.blue.shade700,
+                fontSize: 13,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -179,53 +252,33 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
     }
 
     final usuarioInfo = _usuariosInfo[usuario];
-    final nombre = usuarioInfo?['nombre'] ?? 'Usuario';
-    final email = usuarioInfo?['email'] ?? '';
+    String nombre;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    if (usuarioInfo != null &&
+        usuarioInfo['nombre'] != null &&
+        usuarioInfo['nombre'] != 'Usuario') {
+      nombre = usuarioInfo['nombre'];
+    } else {
+      // Si no hay información del usuario, usar el ID truncado
+      nombre =
+          'Usuario ${usuario.length > 8 ? usuario.substring(0, 8) : usuario}';
+    }
+
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Icon(Icons.person, color: Colors.grey.shade600, size: 18),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                nombre,
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+        Icon(Icons.person, color: Colors.grey.shade600, size: 16),
+        SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            nombre.length > 20 ? '${nombre.substring(0, 17)}...' : nombre,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
             ),
-          ],
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        if (email.isNotEmpty)
-          Padding(
-            padding: EdgeInsets.only(left: 26),
-            child: Text(
-              email,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        if (email.isEmpty)
-          Padding(
-            padding: EdgeInsets.only(left: 26),
-            child: Text(
-              'ID: ${usuario.length > 15 ? usuario.substring(0, 15) + '...' : usuario}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
       ],
     );
   }
@@ -236,26 +289,79 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         (creador is Map) ? creador['genero'] ?? 'No definido' : 'No definido';
 
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: ListTile(
-        leading: Icon(Icons.warning_amber_rounded),
-        title: Text(alerta['detalle'] ?? 'Sin detalle'),
-        subtitle: Text(
-          'Dirección: ${alerta['direccion'] ?? 'Desconocida'}\n'
-          'Estado: ${alerta['status']}\n'
-          'Género creador: $genero',
+        dense: true,
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: Icon(
+          Icons.warning_amber_rounded,
+          size: 20,
+          color: _getStatusColor(alerta['status']),
+        ),
+        title: Text(
+          alerta['detalle'] ?? 'Sin detalle',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Dir: ${_truncateText(alerta['direccion'] ?? 'Desconocida', 25)}',
+              style: TextStyle(fontSize: 12),
+            ),
+            Row(
+              children: [
+                Text(
+                  'Estado: ${alerta['status']}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _getStatusColor(alerta['status']),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'G: $genero',
+                  style: TextStyle(fontSize: 11),
+                ),
+              ],
+            ),
+          ],
         ),
         trailing: Text(
           alerta['fechaHora']?.substring(0, 10) ?? '',
-          style: TextStyle(fontSize: 12),
+          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
         ),
       ),
     );
   }
 
+  String _truncateText(String text, int maxLength) {
+    return text.length > maxLength
+        ? '${text.substring(0, maxLength)}...'
+        : text;
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status) {
+      case 'pendiente':
+        return Colors.orange;
+      case 'en camino':
+        return Colors.blue;
+      case 'atendida':
+        return Colors.green;
+      case 'cancelada':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
   Widget _buildFiltros() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -274,12 +380,13 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
           Text(
             'Filtros de Búsqueda',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
               color: Colors.grey.shade700,
             ),
           ),
-          SizedBox(height: 12),
+          SizedBox(height: 10),
+          // Primera fila: Estado y Período
           Row(
             children: [
               Expanded(
@@ -291,7 +398,7 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
                   icon: Icons.flag,
                 ),
               ),
-              SizedBox(width: 12),
+              SizedBox(width: 8),
               Expanded(
                 child: _buildDropdownField(
                   label: 'Período',
@@ -303,57 +410,17 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
               ),
             ],
           ),
-          SizedBox(height: 12),
+          SizedBox(height: 8),
+          // Segunda fila: Usuario y Género (versión compacta)
           Row(
             children: [
               Expanded(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.people, color: Colors.blue, size: 16),
-                          SizedBox(width: 6),
-                          Text(
-                            'Usuario',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          value: _filtroUsuario,
-                          icon: Icon(Icons.arrow_drop_down, color: Colors.blue),
-                          items: _usuarios.map((usuario) {
-                            return DropdownMenuItem(
-                              value: usuario,
-                              child: _buildUsuarioDropdownItem(usuario),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null && _usuarios.contains(value)) {
-                              setState(() => _filtroUsuario = value);
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                flex: 3,
+                child: _buildUsuarioDropdown(),
               ),
-              SizedBox(width: 12),
+              SizedBox(width: 8),
               Expanded(
+                flex: 2,
                 child: _buildDropdownField(
                   label: 'Género',
                   value: _filtroGenero,
@@ -369,15 +436,9 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
     );
   }
 
-  Widget _buildDropdownField({
-    required String label,
-    required String value,
-    required List<String> items,
-    required Function(String?) onChanged,
-    required IconData icon,
-  }) {
+  Widget _buildUsuarioDropdown() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade300),
         borderRadius: BorderRadius.circular(8),
@@ -387,12 +448,66 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         children: [
           Row(
             children: [
-              Icon(icon, color: Colors.blue, size: 16),
-              SizedBox(width: 6),
+              Icon(Icons.people, color: Colors.blue, size: 14),
+              SizedBox(width: 4),
+              Text(
+                'Usuario',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: _filtroUsuario,
+              icon: Icon(Icons.arrow_drop_down, color: Colors.blue, size: 18),
+              isDense: true,
+              items: _usuarios.map((usuario) {
+                return DropdownMenuItem(
+                  value: usuario,
+                  child: _buildUsuarioDropdownItem(usuario),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null && _usuarios.contains(value)) {
+                  setState(() => _filtroUsuario = value);
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String value,
+    required List<String> items,
+    required Function(String?) onChanged,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: Colors.blue, size: 14),
+              SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: Colors.grey.shade600,
                   fontWeight: FontWeight.w500,
                 ),
@@ -403,13 +518,15 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
             child: DropdownButton<String>(
               isExpanded: true,
               value: value,
-              icon: Icon(Icons.arrow_drop_down, color: Colors.blue),
+              icon: Icon(Icons.arrow_drop_down, color: Colors.blue, size: 18),
+              isDense: true,
               items: items.map((item) {
                 return DropdownMenuItem(
                   value: item,
                   child: Text(
                     item == 'Todos' ? 'Todos' : item,
-                    style: TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 );
               }).toList(),
@@ -488,7 +605,7 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
               : Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
                       child: _buildFiltros(),
                     ),
                     Expanded(
@@ -496,7 +613,7 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
                         onRefresh: _obtenerAlertas,
                         color: Colors.blue,
                         child: ListView.builder(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          padding: EdgeInsets.symmetric(horizontal: 12),
                           itemCount: _filtrarAlertas().length,
                           itemBuilder: (context, index) =>
                               _buildAlertaCard(_filtrarAlertas()[index]),
