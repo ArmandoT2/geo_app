@@ -122,14 +122,13 @@ class _AlertaAdminFormScreenState extends State<AlertaAdminFormScreen> {
           if (widget.alerta != null)
             TextButton(
               onPressed: _isLoading ? null : _guardarCambios,
-              child:
-                  _isLoading
-                      ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : Text('Guardar', style: TextStyle(color: Colors.white)),
+              child: _isLoading
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text('Guardar', style: TextStyle(color: Colors.white)),
             ),
         ],
       ),
@@ -166,7 +165,6 @@ class _AlertaAdminFormScreenState extends State<AlertaAdminFormScreen> {
                 ),
                 SizedBox(height: 16),
               ],
-
               TextFormField(
                 controller: _direccionController,
                 decoration: InputDecoration(
@@ -181,27 +179,47 @@ class _AlertaAdminFormScreenState extends State<AlertaAdminFormScreen> {
                   return null;
                 },
               ),
-
               SizedBox(height: 16),
-
               TextFormField(
                 controller: _detalleController,
                 maxLines: 3,
+                maxLength: 200, // Límite de caracteres
                 decoration: InputDecoration(
                   labelText: 'Detalle de la alerta',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.description),
+                  hintText:
+                      'Describe brevemente la situación (5-50 palabras)...',
+                  helperText: 'Entre 5 y 50 palabras, máximo 200 caracteres',
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor ingrese el detalle';
+                  if (value == null || value.trim().isEmpty) {
+                    return 'El detalle de la alerta es requerido';
                   }
+
+                  final trimmedValue = value.trim();
+
+                  // Validar caracteres mínimos y máximos
+                  if (trimmedValue.length < 10) {
+                    return 'Detalle muy corto (mínimo 10 caracteres)';
+                  }
+                  if (trimmedValue.length > 200) {
+                    return 'Detalle muy largo (máximo 200 caracteres)';
+                  }
+
+                  // Validar número de palabras
+                  final palabras = trimmedValue.split(RegExp(r'\s+'));
+                  if (palabras.length < 5) {
+                    return 'Detalle muy breve (mínimo 5 palabras)';
+                  }
+                  if (palabras.length > 50) {
+                    return 'Detalle muy extenso (máximo 50 palabras)';
+                  }
+
                   return null;
                 },
               ),
-
               SizedBox(height: 16),
-
               Row(
                 children: [
                   Expanded(
@@ -249,9 +267,7 @@ class _AlertaAdminFormScreenState extends State<AlertaAdminFormScreen> {
                   ),
                 ],
               ),
-
               SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: _status,
                 decoration: InputDecoration(
@@ -274,9 +290,7 @@ class _AlertaAdminFormScreenState extends State<AlertaAdminFormScreen> {
                   setState(() => _status = value!);
                 },
               ),
-
               SizedBox(height: 16),
-
               SwitchListTile(
                 title: Text('Visible para el ciudadano'),
                 subtitle: Text(
@@ -292,9 +306,7 @@ class _AlertaAdminFormScreenState extends State<AlertaAdminFormScreen> {
                   _visible ? Icons.visibility : Icons.visibility_off,
                 ),
               ),
-
               SizedBox(height: 32),
-
               if (widget.alerta != null)
                 SizedBox(
                   width: double.infinity,
@@ -303,10 +315,9 @@ class _AlertaAdminFormScreenState extends State<AlertaAdminFormScreen> {
                     style: ElevatedButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child:
-                        _isLoading
-                            ? CircularProgressIndicator()
-                            : Text('Actualizar Alerta'),
+                    child: _isLoading
+                        ? CircularProgressIndicator()
+                        : Text('Actualizar Alerta'),
                   ),
                 ),
             ],

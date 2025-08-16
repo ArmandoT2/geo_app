@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -30,12 +31,24 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
   final List<String> _rangosFecha = ['Todos', 'Últimos 7 días', 'Último mes'];
   final List<String> _generos = ['Todos', 'masculino', 'femenino'];
   List<String> _usuarios = ['Todos'];
+  List<String> _usuariosFiltrados = ['Todos'];
   Map<String, Map<String, dynamic>> _usuariosInfo = {};
+
+  // Búsqueda de usuarios
+  final TextEditingController _busquedaUsuarioController =
+      TextEditingController();
+  bool _mostrarBusquedaUsuario = false;
 
   @override
   void initState() {
     super.initState();
     _obtenerAlertas();
+  }
+
+  @override
+  void dispose() {
+    _busquedaUsuarioController.dispose();
+    super.dispose();
   }
 
   Future<void> _obtenerAlertas() async {
@@ -116,10 +129,17 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         setState(() {
           _alertas = alertas;
           _usuarios = ['Todos', ...usuariosMap.keys.toList()];
+          _usuariosFiltrados = List.from(_usuarios);
           _usuariosInfo = usuariosMap;
           // Asegurar que el filtro actual esté en la lista
           if (!_usuarios.contains(_filtroUsuario)) {
             _filtroUsuario = 'Todos';
+          }
+          // Asegurar que el filtro actual esté en la lista filtrada
+          if (!_usuariosFiltrados.contains(_filtroUsuario)) {
+            _usuariosFiltrados = List.from(_usuarios);
+            _busquedaUsuarioController.clear();
+            _mostrarBusquedaUsuario = false;
           }
           _loading = false;
         });
@@ -171,6 +191,32 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
     } catch (e) {
       print('❌ Error al obtener información de usuarios: $e');
     }
+  }
+
+  void _filtrarUsuarios(String busqueda) {
+    setState(() {
+      if (busqueda.isEmpty) {
+        _usuariosFiltrados = List.from(_usuarios);
+      } else {
+        _usuariosFiltrados = _usuarios.where((usuarioId) {
+          if (usuarioId == 'Todos') return true;
+
+          final usuarioInfo = _usuariosInfo[usuarioId];
+          String nombreBusqueda = '';
+
+          if (usuarioInfo != null && usuarioInfo['nombre'] != null) {
+            nombreBusqueda = usuarioInfo['nombre'].toString().toLowerCase();
+          } else {
+            nombreBusqueda =
+                'usuario ${usuarioId.substring(0, min(8, usuarioId.length))}'
+                    .toLowerCase();
+          }
+
+          return nombreBusqueda.contains(busqueda.toLowerCase()) ||
+              usuarioId.toLowerCase().contains(busqueda.toLowerCase());
+        }).toList();
+      }
+    });
   }
 
   List<dynamic> _filtrarAlertas() {
@@ -227,60 +273,6 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
 
       return true;
     }).toList();
-  }
-
-  Widget _buildUsuarioDropdownItem(String usuario) {
-    if (usuario == 'Todos') {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.people, color: Colors.blue, size: 18),
-          SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Todos los usuarios',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.blue.shade700,
-                fontSize: 13,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      );
-    }
-
-    final usuarioInfo = _usuariosInfo[usuario];
-    String nombre;
-
-    if (usuarioInfo != null &&
-        usuarioInfo['nombre'] != null &&
-        usuarioInfo['nombre'] != 'Usuario') {
-      nombre = usuarioInfo['nombre'];
-    } else {
-      // Si no hay información del usuario, usar el ID truncado
-      nombre =
-          'Usuario ${usuario.length > 8 ? usuario.substring(0, 8) : usuario}';
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.person, color: Colors.grey.shade600, size: 16),
-        SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            nombre.length > 20 ? '${nombre.substring(0, 17)}...' : nombre,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 13,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
   }
 
   Widget _buildAlertaCard(dynamic alerta) {
@@ -446,6 +438,7 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header con icono y label
           Row(
             children: [
               Icon(Icons.people, color: Colors.blue, size: 14),
@@ -460,28 +453,204 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
               ),
             ],
           ),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              isExpanded: true,
-              value: _filtroUsuario,
-              icon: Icon(Icons.arrow_drop_down, color: Colors.blue, size: 18),
+          SizedBox(height: 4),
+
+          // Campo de búsqueda siempre visible
+          TextField(
+            controller: _busquedaUsuarioController,
+            style: TextStyle(fontSize: 12),
+            decoration: InputDecoration(
+              hintText: _filtroUsuario == 'Todos'
+                  ? 'Buscar usuario...'
+                  : _obtenerNombreUsuario(_filtroUsuario),
+              hintStyle: TextStyle(
+                fontSize: 11,
+                color: _filtroUsuario == 'Todos'
+                    ? Colors.grey.shade500
+                    : Colors.black87,
+                fontWeight: _filtroUsuario == 'Todos'
+                    ? FontWeight.normal
+                    : FontWeight.w500,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.blue, width: 1.5),
+              ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               isDense: true,
-              items: _usuarios.map((usuario) {
-                return DropdownMenuItem(
-                  value: usuario,
-                  child: _buildUsuarioDropdownItem(usuario),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null && _usuarios.contains(value)) {
-                  setState(() => _filtroUsuario = value);
-                }
-              },
+              prefixIcon:
+                  Icon(Icons.search, size: 16, color: Colors.grey.shade500),
+              suffixIcon: _busquedaUsuarioController.text.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.clear,
+                          size: 16, color: Colors.grey.shade500),
+                      constraints: BoxConstraints(minHeight: 24, minWidth: 24),
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        _busquedaUsuarioController.clear();
+                        _filtrarUsuarios('');
+                        setState(() => _filtroUsuario = 'Todos');
+                      },
+                    )
+                  : (_filtroUsuario != 'Todos'
+                      ? IconButton(
+                          icon: Icon(Icons.close, size: 16, color: Colors.blue),
+                          constraints:
+                              BoxConstraints(minHeight: 24, minWidth: 24),
+                          padding: EdgeInsets.zero,
+                          onPressed: () {
+                            _busquedaUsuarioController.clear();
+                            _filtrarUsuarios('');
+                            setState(() => _filtroUsuario = 'Todos');
+                          },
+                        )
+                      : null),
             ),
+            onChanged: (value) {
+              _filtrarUsuarios(value);
+              // Auto-seleccionar si hay una coincidencia exacta
+              if (value.isNotEmpty) {
+                final coincidenciaExacta = _usuariosFiltrados.firstWhere(
+                  (usuario) =>
+                      usuario != 'Todos' &&
+                      _obtenerNombreUsuario(usuario).toLowerCase() ==
+                          value.toLowerCase(),
+                  orElse: () => '',
+                );
+                if (coincidenciaExacta.isNotEmpty) {
+                  setState(() => _filtroUsuario = coincidenciaExacta);
+                }
+              }
+            },
+            onTap: () {
+              // Expandir lista de sugerencias al hacer tap
+              setState(() {
+                _mostrarBusquedaUsuario = true;
+              });
+            },
           ),
+
+          // Lista de sugerencias expandible
+          if (_mostrarBusquedaUsuario ||
+              _busquedaUsuarioController.text.isNotEmpty) ...[
+            SizedBox(height: 4),
+            Container(
+              constraints: BoxConstraints(maxHeight: 150),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(4),
+                color: Colors.white,
+              ),
+              child: _usuariosFiltrados.isEmpty
+                  ? Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'No se encontraron usuarios',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      itemCount: _usuariosFiltrados.length,
+                      itemBuilder: (context, index) {
+                        final usuario = _usuariosFiltrados[index];
+                        final esSeleccionado = usuario == _filtroUsuario;
+
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _filtroUsuario = usuario;
+                              _mostrarBusquedaUsuario = false;
+                              if (usuario == 'Todos') {
+                                _busquedaUsuarioController.clear();
+                                _usuariosFiltrados = List.from(_usuarios);
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: esSeleccionado
+                                  ? Colors.blue.shade50
+                                  : Colors.transparent,
+                              border: index < _usuariosFiltrados.length - 1
+                                  ? Border(
+                                      bottom: BorderSide(
+                                          color: Colors.grey.shade200))
+                                  : null,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  usuario == 'Todos'
+                                      ? Icons.people
+                                      : Icons.person,
+                                  size: 16,
+                                  color: esSeleccionado
+                                      ? Colors.blue
+                                      : (usuario == 'Todos'
+                                          ? Colors.blue
+                                          : Colors.grey.shade600),
+                                ),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _obtenerNombreUsuario(usuario),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: esSeleccionado
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      color: esSeleccionado
+                                          ? Colors.blue.shade700
+                                          : Colors.black87,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (esSeleccionado)
+                                  Icon(
+                                    Icons.check,
+                                    size: 16,
+                                    color: Colors.blue,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _obtenerNombreUsuario(String usuarioId) {
+    if (usuarioId == 'Todos') {
+      return 'Todos los usuarios';
+    }
+
+    final usuarioInfo = _usuariosInfo[usuarioId];
+    if (usuarioInfo != null &&
+        usuarioInfo['nombre'] != null &&
+        usuarioInfo['nombre'] != 'Usuario') {
+      return usuarioInfo['nombre'];
+    } else {
+      return 'Usuario ${usuarioId.length > 8 ? usuarioId.substring(0, 8) : usuarioId}';
+    }
   }
 
   Widget _buildDropdownField({
@@ -554,74 +723,84 @@ class _ReportesAlertasScreenState extends State<ReportesAlertasScreen> {
         elevation: 0,
         iconTheme: IconThemeData(color: Colors.white),
       ),
-      body: _loading
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Cargando reportes...',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : _alertas.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.assignment_outlined,
-                        size: 64,
-                        color: Colors.grey.shade400,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'No hay alertas registradas',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Las alertas aparecerán aquí cuando se registren',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : Column(
+      body: GestureDetector(
+        onTap: () {
+          // Cerrar la lista de sugerencias al tocar fuera
+          setState(() {
+            _mostrarBusquedaUsuario = false;
+          });
+          // Desenfocar el campo de texto
+          FocusScope.of(context).unfocus();
+        },
+        child: _loading
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
-                      child: _buildFiltros(),
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
                     ),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _obtenerAlertas,
-                        color: Colors.blue,
-                        child: ListView.builder(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: _filtrarAlertas().length,
-                          itemBuilder: (context, index) =>
-                              _buildAlertaCard(_filtrarAlertas()[index]),
-                        ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Cargando reportes...',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 16,
                       ),
                     ),
                   ],
                 ),
+              )
+            : _alertas.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.assignment_outlined,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No hay alertas registradas',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Las alertas aparecerán aquí cuando se registren',
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
+                        child: _buildFiltros(),
+                      ),
+                      Expanded(
+                        child: RefreshIndicator(
+                          onRefresh: _obtenerAlertas,
+                          color: Colors.blue,
+                          child: ListView.builder(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            itemCount: _filtrarAlertas().length,
+                            itemBuilder: (context, index) =>
+                                _buildAlertaCard(_filtrarAlertas()[index]),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+      ),
     );
   }
 }

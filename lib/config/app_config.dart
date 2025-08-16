@@ -10,8 +10,8 @@ class AppConfig {
     }
 
     if (Platform.isAndroid) {
-      // Usar IP de la máquina para conexión desde emulador
-      return 'http://192.168.100.124:3000';
+      // Usar IP especial del emulador Android para conectar al host
+      return 'http://10.0.2.2:3000';
     } else if (Platform.isIOS) {
       return 'http://localhost:3000';
     } else {

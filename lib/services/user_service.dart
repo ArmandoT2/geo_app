@@ -152,6 +152,38 @@ class UserService {
     }
   }
 
+  // Cambiar contraseña como administrador
+  static Future<Map<String, dynamic>> cambiarContrasenaAdmin(
+    String userId,
+    String contrasenaNueva,
+  ) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse(
+                '${AppConfig.usuariosUrl}/$userId/cambiar-password-admin'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'newPassword': contrasenaNueva,
+            }),
+          )
+          .timeout(Duration(seconds: AppConfig.connectionTimeout));
+
+      final responseData = json.decode(response.body);
+
+      return {
+        'success': response.statusCode == 200,
+        'message': responseData['mensaje'] ?? 'Error desconocido',
+      };
+    } catch (e) {
+      print('Error en cambiarContrasenaAdmin: $e');
+      return {
+        'success': false,
+        'message': 'Error de conexión al cambiar contraseña',
+      };
+    }
+  }
+
   // Eliminar cuenta del ciudadano (soft delete)
   static Future<Map<String, dynamic>> eliminarCuentaCiudadano(
     String userId,

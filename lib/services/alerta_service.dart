@@ -13,15 +13,30 @@ class AlertaService {
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: AppConfig.connectionTimeout));
 
-      print('Respuesta status: ${response.statusCode}');
-      print('Respuesta body: ${response.body}');
+      print('🔍 OBTENIENDO ALERTAS PARA USUARIO: $userId');
+      print('📤 Respuesta status: ${response.statusCode}');
+      print('📤 Respuesta body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> body = json.decode(response.body);
-        final todasLasAlertas = body.map((e) => Alerta.fromJson(e)).toList();
+        print('📊 Datos recibidos: ${body.length} elementos');
 
-        // Filtrar solo las alertas visibles para el ciudadano
-        return todasLasAlertas.where((alerta) => alerta.visible).toList();
+        List<Alerta> alertasValidas = [];
+        for (int i = 0; i < body.length; i++) {
+          try {
+            final alerta = Alerta.fromJson(body[i]);
+            alertasValidas.add(alerta);
+            print('✅ Alerta ${i + 1} parseada: ${alerta.id}');
+          } catch (e) {
+            print('❌ Error parseando alerta ${i + 1}: $e');
+            print('❌ Datos problemáticos: ${body[i]}');
+          }
+        }
+
+        // Retornar todas las alertas válidas del usuario
+        // El filtrado por visibilidad se maneja en el backend según el contexto
+        print('🎯 RESULTADO: ${alertasValidas.length} alertas del usuario');
+        return alertasValidas;
       } else {
         throw Exception('Error al obtener alertas: ${response.statusCode}');
       }
@@ -91,7 +106,19 @@ class AlertaService {
           print(body.first);
         }
 
-        return body.map((e) => Alerta.fromJson(e)).toList();
+        List<Alerta> alertasValidas = [];
+        for (int i = 0; i < body.length; i++) {
+          try {
+            final alerta = Alerta.fromJson(body[i]);
+            alertasValidas.add(alerta);
+          } catch (e) {
+            print('❌ Error parseando alerta pendiente ${i + 1}: $e');
+          }
+        }
+
+        print(
+            '✅ Alertas pendientes parseadas: ${alertasValidas.length} de ${body.length}');
+        return alertasValidas;
       } else {
         throw Exception(
           'Error al obtener alertas pendientes: ${response.statusCode}',
@@ -113,6 +140,7 @@ class AlertaService {
     double? destinoLat,
     double? destinoLng,
     String? evidenciaUrl,
+    String? detallesAtencion,
   }) async {
     final uri = Uri.parse('${AppConfig.alertasUrl}/$alertaId/status');
 
@@ -130,6 +158,7 @@ class AlertaService {
           destinoLng != null)
         'destino': {'lat': destinoLat, 'lng': destinoLng},
       if (evidenciaUrl != null) 'evidenciaUrl': evidenciaUrl,
+      if (detallesAtencion != null) 'detallesAtencion': detallesAtencion,
     };
 
     final response = await http.put(
@@ -154,7 +183,20 @@ class AlertaService {
 
       if (response.statusCode == 200) {
         final List<dynamic> body = jsonDecode(response.body);
-        return body.map((e) => Alerta.fromJson(e)).toList();
+
+        List<Alerta> alertasValidas = [];
+        for (int i = 0; i < body.length; i++) {
+          try {
+            final alerta = Alerta.fromJson(body[i]);
+            alertasValidas.add(alerta);
+          } catch (e) {
+            print('❌ Error parseando alerta admin ${i + 1}: $e');
+          }
+        }
+
+        print(
+            '✅ Alertas admin parseadas: ${alertasValidas.length} de ${body.length}');
+        return alertasValidas;
       } else {
         throw Exception(
           'Error al obtener todas las alertas: ${response.statusCode}',
@@ -269,6 +311,55 @@ class AlertaService {
       }
 
       return false;
+    }
+  }
+
+  // Obtener alertas atendidas por un policía específico
+  Future<List<Alerta>> obtenerAlertasAtendidasPorPolicia(
+      String policiaId) async {
+    try {
+      final url = '${AppConfig.alertasUrl}/atendidas-por-policia/$policiaId';
+      print('🌐 URL completa: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      print('📤 RESPUESTA DEL SERVIDOR:');
+      print('📤 Código de estado: ${response.statusCode}');
+      print('📤 Cuerpo de respuesta: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        print('📊 Datos parseados: ${data.length} elementos');
+        if (data.isNotEmpty) {
+          print('📄 Primer elemento: ${data.first}');
+        }
+
+        List<Alerta> alertas = [];
+        for (int i = 0; i < data.length; i++) {
+          try {
+            final alerta = Alerta.fromJson(data[i]);
+            alertas.add(alerta);
+            print('✅ Alerta ${i + 1} parseada correctamente: ${alerta.id}');
+          } catch (e) {
+            print('❌ Error parseando alerta ${i + 1}: $e');
+            print('❌ Datos de la alerta problemática: ${data[i]}');
+          }
+        }
+
+        print(
+            '🎯 RESULTADO FINAL: ${alertas.length} alertas válidas de ${data.length} recibidas');
+        return alertas;
+      } else {
+        print('❌ Error HTTP ${response.statusCode}: ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ EXCEPCIÓN en obtenerAlertasAtendidasPorPolicia: $e');
+      print('❌ Tipo de error: ${e.runtimeType}');
+      return [];
     }
   }
 }

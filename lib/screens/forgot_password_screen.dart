@@ -17,10 +17,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _isLoading = false;
   bool _showPasswordFields = false;
 
+  // Función para validar formato de email
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        .hasMatch(email);
+  }
+
   Future<void> resetPassword(BuildContext context) async {
-    if (emailCtrl.text.trim().isEmpty) {
+    final email = emailCtrl.text.trim();
+
+    if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Por favor ingresa tu correo electrónico')),
+      );
+      return;
+    }
+
+    // Validar formato de email
+    if (!_isValidEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Por favor ingresa un email válido')),
       );
       return;
     }
@@ -80,11 +96,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       final body = _showPasswordFields
           ? {
-              'email': emailCtrl.text.trim(),
+              'email': email,
               'newPassword': newPasswordCtrl.text.trim(),
             }
           : {
-              'email': emailCtrl.text.trim(),
+              'email': email,
             };
 
       final response = await http

@@ -103,12 +103,46 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
   }
 
   Future<void> _guardarAlerta() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validar formulario
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '⚠️ Por favor completa todos los campos requeridos',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     if (_selectedPosition == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Selecciona una ubicación en el mapa'),
+          content: Row(
+            children: [
+              Icon(Icons.location_off, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '📍 Selecciona una ubicación en el mapa',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
           backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
         ),
       );
       return;
@@ -496,9 +530,12 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
                       ),
                     ),
 
-                    // Formulario con altura fija
+                    // Formulario con altura dinámica
                     Container(
-                      height: 280,
+                      constraints: BoxConstraints(
+                        minHeight: 280,
+                        maxHeight: MediaQuery.of(context).size.height * 0.5,
+                      ),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -511,130 +548,162 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
                           ),
                         ],
                       ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              '🚨 Describe la emergencia',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red[700],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-
-                            // Campo de descripción
-                            Container(
-                              height: 80,
-                              child: TextFormField(
-                                controller: _detalleController,
-                                maxLines: 3,
-                                decoration: const InputDecoration(
-                                  labelText: 'Descripción de la emergencia',
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(
-                                    Icons.emergency,
-                                    color: Colors.red,
-                                  ),
-                                  hintText:
-                                      'Describe brevemente la situación...',
+                      child: SingleChildScrollView(
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '🚨 Describe la emergencia',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red[700],
                                 ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'La descripción es requerida';
-                                  }
-                                  if (value.trim().length < 10) {
-                                    return 'Mínimo 10 caracteres';
-                                  }
-                                  return null;
-                                },
                               ),
-                            ),
+                              const SizedBox(height: 12),
 
-                            const SizedBox(height: 12),
-
-                            // Info de ubicación
-                            if (_selectedPosition != null)
+                              // Campo de descripción
                               Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
+                                height: 100,
+                                child: Column(
                                   children: [
-                                    Icon(
-                                      Icons.location_on,
-                                      color: Colors.red,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 8),
                                     Expanded(
-                                      child: Text(
-                                        'Ubicación: $_direccionActual',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
+                                      child: TextFormField(
+                                        controller: _detalleController,
+                                        maxLines: 3,
+                                        maxLength: 200, // Límite de caracteres
+                                        decoration: const InputDecoration(
+                                          labelText:
+                                              'Descripción de la emergencia *',
+                                          border: OutlineInputBorder(),
+                                          prefixIcon: Icon(
+                                            Icons.emergency,
+                                            color: Colors.red,
+                                          ),
+                                          hintText:
+                                              'Ej: Accidente vehicular con heridos, Incendio en edificio, Robo en progreso...',
+                                          helperText:
+                                              '💡 Describe qué está pasando (5-50 palabras, máx. 200 caracteres)',
                                         ),
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return '⚠️ Por favor describe la emergencia';
+                                          }
+
+                                          final trimmedValue = value.trim();
+
+                                          // Validar caracteres mínimos y máximos
+                                          if (trimmedValue.length < 10) {
+                                            return '📝 Descripción muy corta (mínimo 10 caracteres)';
+                                          }
+                                          if (trimmedValue.length > 200) {
+                                            return '📝 Descripción muy larga (máximo 200 caracteres)';
+                                          }
+
+                                          // Validar número de palabras
+                                          final palabras = trimmedValue
+                                              .split(RegExp(r'\s+'));
+                                          if (palabras.length < 5) {
+                                            return '💬 Descripción muy breve (mínimo 5 palabras)';
+                                          }
+                                          if (palabras.length > 50) {
+                                            return '💬 Descripción muy extensa (máximo 50 palabras)';
+                                          }
+
+                                          return null;
+                                        },
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
 
-                            const SizedBox(height: 16),
+                              const SizedBox(height: 12),
 
-                            // Botón de envío
-                            SizedBox(
-                              height: 50,
-                              child: ElevatedButton.icon(
-                                onPressed:
-                                    _enviandoAlerta ? null : _guardarAlerta,
-                                icon: _enviandoAlerta
-                                    ? SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(
-                                        Icons.emergency,
-                                        color: Colors.white,
-                                      ),
-                                label: Text(
-                                  _enviandoAlerta
-                                      ? 'ENVIANDO...'
-                                      : '🚨 ENVIAR ALERTA',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  shape: RoundedRectangleBorder(
+                              // Info de ubicación
+                              if (_selectedPosition != null)
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
                                     borderRadius: BorderRadius.circular(8),
                                   ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        color: Colors.red,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Ubicación: $_direccionActual',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                              const SizedBox(height: 16),
+
+                              // Botón de envío
+                              SizedBox(
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed:
+                                      _enviandoAlerta ? null : _guardarAlerta,
+                                  icon: _enviandoAlerta
+                                      ? SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.emergency,
+                                          color: Colors.white,
+                                        ),
+                                  label: Text(
+                                    _enviandoAlerta
+                                        ? 'ENVIANDO...'
+                                        : '🚨 ENVIAR ALERTA',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
 
-                            const SizedBox(height: 8),
-                            Text(
-                              '💡 Toca en el mapa para ajustar la ubicación precisa',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
+                              const SizedBox(height: 8),
+                              Text(
+                                '💡 Toca en el mapa para ajustar la ubicación precisa',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

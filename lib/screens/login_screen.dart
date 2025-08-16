@@ -16,10 +16,37 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordCtrl = TextEditingController();
   bool _isLoading = false;
 
+  // Función para validar formato de email
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        .hasMatch(email);
+  }
+
   Future<void> loginUser(BuildContext context) async {
-    if (emailCtrl.text.trim().isEmpty || passwordCtrl.text.trim().isEmpty) {
+    final email = emailCtrl.text.trim();
+    final password = passwordCtrl.text.trim();
+
+    // Validaciones básicas
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Por favor completa todos los campos')),
+      );
+      return;
+    }
+
+    // Validar formato de email
+    if (!_isValidEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Por favor ingresa un email válido')),
+      );
+      return;
+    }
+
+    // Validar longitud mínima de contraseña
+    if (password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('La contraseña debe tener al menos 8 caracteres')),
       );
       return;
     }
@@ -38,8 +65,8 @@ class _LoginScreenState extends State<LoginScreen> {
             Uri.parse(AppConfig.loginUrl),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'email': emailCtrl.text.trim(),
-              'password': passwordCtrl.text.trim(),
+              'email': email,
+              'password': password,
             }),
           )
           .timeout(Duration(seconds: AppConfig.connectionTimeout));
@@ -51,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
         SharedPreferences prefs = await SharedPreferences.getInstance();
 
         // Guardar datos del usuario en SharedPreferences
-        await prefs.setString('email', emailCtrl.text.trim());
+        await prefs.setString('email', email);
 
         final user = data['user'];
         if (user != null) {

@@ -367,22 +367,12 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
+                              Text(
+                                alerta.status.toUpperCase(),
+                                style: TextStyle(
                                   color: _getStatusColor(alerta.status),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  alerta.status.toUpperCase(),
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
@@ -507,16 +497,16 @@ class _AlertaPoliceScreenState extends State<AlertaPoliceScreen> {
                                   });
                                 });
                               },
-                              icon: Icon(Icons.navigation, size: 16),
+                              icon: Icon(Icons.visibility, size: 16),
                               label: Text(
-                                'ATENDER',
+                                'VER DETALLE',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
+                                backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
                                 padding: EdgeInsets.symmetric(vertical: 8),
                                 shape: RoundedRectangleBorder(

@@ -93,6 +93,11 @@ class _HomeScreenState extends State<HomeScreen> {
             Icons.notifications_active,
             () => _navigateTo('/atender-alerta'),
           ),
+          _buildMenuCard(
+            'Mis Alertas Atendidas',
+            Icons.assignment_turned_in,
+            () => _navigateTo('/alertas-atendidas'),
+          ),
           NotificationBadge(
             onTap: () => _navigateTo('/notificaciones'),
             child: _buildMenuCard(

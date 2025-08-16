@@ -6,6 +6,8 @@ import '../screens/actualizar_datos_screen.dart';
 import '../screens/alert_screen.dart';
 import '../screens/alerta_form_screen.dart';
 import '../screens/alerta_police_screen.dart';
+import '../screens/alertas_atendidas_screen.dart';
+import '../screens/cambiar_contrasena_admin_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/configuraciones_ciudadano_screen.dart';
 import '../screens/contactos_screen.dart';
@@ -31,6 +33,7 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/configuraciones-ciudadano': (context) => ConfiguracionesCiudadanoScreen(),
   '/crear-usuario': (_) => CrearUsuarioScreen(),
   '/editar-usuario': (_) => EditarUsuarioScreen(),
+  '/cambiar-contrasena-admin': (_) => CambiarContrasenaAdminScreen(),
   '/crear-alerta': (context) {
     final userId = ModalRoute.of(context)!.settings.arguments as String? ?? '';
     return AlertaFormScreen(userId: userId);
@@ -40,6 +43,7 @@ final Map<String, WidgetBuilder> appRoutes = {
     return AlertaListScreen(userId: userId);
   },
   '/atender-alerta': (_) => AlertaPoliceScreen(),
+  '/alertas-atendidas': (context) => const AlertasAtendidasScreen(),
   '/contactos': (_) => ContactosScreen(),
   '/notificaciones': (_) => NotificacionesScreen(),
   '/reportes-alertas': (_) => ReportesAlertasScreen(),

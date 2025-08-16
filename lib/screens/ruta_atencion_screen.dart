@@ -68,6 +68,11 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
   // Variable para almacenar información del usuario creador
   Map<String, dynamic>? _infoUsuarioCreador;
 
+  // Controlador para el campo de detalles de atención
+  final TextEditingController _detallesAtencionController =
+      TextEditingController();
+  bool _detallesValidos = false;
+
   @override
   void initState() {
     super.initState();
@@ -80,126 +85,111 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     print('Dirección (campo original): "${widget.alerta.direccion}"');
     print('Dirección completa (getter): "${widget.alerta.direccionCompleta}"');
     print('Coordenadas: lat=${widget.alerta.lat}, lng=${widget.alerta.lng}');
-    
+
     // **DEBUG ESPECÍFICO PARA "EN CAMINO"**
     if (widget.alerta.status == 'en camino') {
-      print('🚚 ESTADO "EN CAMINO" DETECTADO - Aplicando lógica especial de centrado');
-      print('   -> Se aplicarán delays adicionales para evitar interferencia de rutas');
+      print(
+          '🚚 ESTADO "EN CAMINO" DETECTADO - Aplicando lógica especial de centrado');
+      print(
+          '   -> Se aplicarán delays adicionales para evitar interferencia de rutas');
       print('   -> Se forzará re-centrado después de generar rutas');
     }
-    
+
     print('==============================');
 
     // **CRÍTICO: Establecer coordenadas de la alerta INMEDIATAMENTE**
     if (widget.alerta.lat != null && widget.alerta.lng != null) {
       _ubicacionAlerta = LatLng(widget.alerta.lat!, widget.alerta.lng!);
-      print('🎯 Coordenadas de alerta establecidas inmediatamente: ${_ubicacionAlerta}');
+      print(
+          '🎯 Coordenadas de alerta establecidas inmediatamente: ${_ubicacionAlerta}');
     }
 
-    _inicializarUbicaciones();
-    _obtenerInfoUsuarioCreador();
+    // Inicializar después de que el widget esté completamente construido
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _inicializarUbicaciones();
+        _obtenerInfoUsuarioCreador();
+      }
+    });
   }
 
   @override
   void dispose() {
     // Limpiar recursos antes de desmontar el widget
     _mapController.dispose();
+    _detallesAtencionController.dispose();
     super.dispose();
   }
 
   Future<void> _inicializarUbicaciones() async {
     try {
-      // Obtener ubicación actual de la policía
-      final ubicacionActual = await LocationService.getCurrentLocation();
-
-      // Ubicación de la alerta (destino)
+      // Configurar ubicación de la alerta primero (sin esperar)
       final destinoAlerta = LatLng(
         widget.alerta.lat ?? -12.0464,
         widget.alerta.lng ?? -77.0428,
       );
 
+      // Establecer estado inicial inmediatamente
       if (mounted) {
         setState(() {
-          _ubicacionPolicia = ubicacionActual ?? LatLng(-12.0464, -77.0428);
           _ubicacionAlerta = destinoAlerta;
           _cargandoUbicacion = false;
         });
+      }
 
-        // Debug: Verificar coordenadas
-        print('🔍 Coordenadas establecidas:');
-        print('  Alerta: ${widget.alerta.lat}, ${widget.alerta.lng}');
-        print(
-            '  _ubicacionAlerta: ${_ubicacionAlerta?.latitude}, ${_ubicacionAlerta?.longitude}');
+      // Obtener ubicación de policía en background (con timeout)
+      LocationService.getCurrentLocation()
+          .timeout(
+        Duration(seconds: 3),
+        onTimeout: () => null,
+      )
+          .then((ubicacionActual) {
+        if (mounted) {
+          setState(() {
+            _ubicacionPolicia = ubicacionActual ?? LatLng(-12.0464, -77.0428);
+          });
 
-        // Centrar inmediatamente el mapa en el punto del incidente al cargar
-        _centrarInicialmenteEnIncidente();
+          // Generar ruta solo si obtuvimos la ubicación
+          _generarRuta();
+        }
+      }).catchError((e) {
+        print('Error obteniendo ubicación de policía: $e');
+        if (mounted) {
+          setState(() {
+            _ubicacionPolicia = LatLng(-12.0464, -77.0428);
+          });
+        }
+      });
 
-        // **SOLUCIÓN PARA RE-ENTRADA: Centrado adicional después de ubicaciones**
-        // Especialmente importante cuando el gendarme vuelve a entrar a una alerta "en camino"
-        Future.delayed(Duration(milliseconds: 800), () {
-          if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
-            final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
-            _mapController.move(puntoIncidente, 16.0);
-            print('🔄 Centrado post-inicialización aplicado para re-entrada');
-          }
-        });
+      // Debug: Verificar coordenadas
+      print('🔍 Coordenadas establecidas:');
+      print('  Alerta: ${widget.alerta.lat}, ${widget.alerta.lng}');
+      print(
+          '  _ubicacionAlerta: ${_ubicacionAlerta?.latitude}, ${_ubicacionAlerta?.longitude}');
 
-        // **FIX PARA ESTADO "EN CAMINO": Retrasar generación de ruta**
-        // Si está "en camino", retrasar la ruta para no interferir con el centrado
-        int delayRuta = _estadoActual == 'en camino' ? 1500 : 300;
-        print('🗺️ Estado: $_estadoActual - Delay para ruta: ${delayRuta}ms');
-        
-        Future.delayed(Duration(milliseconds: delayRuta), () {
+      // Centrar el mapa en el punto del incidente después de un pequeño delay
+      if (widget.alerta.lat != null && widget.alerta.lng != null) {
+        Future.delayed(Duration(milliseconds: 200), () {
           if (mounted) {
-            _generarRuta();
+            final puntoIncidente =
+                LatLng(widget.alerta.lat!, widget.alerta.lng!);
+            _mapController.move(puntoIncidente, 16.0);
+            print(
+                '🎯 Mapa centrado en incidente: ${widget.alerta.lat}, ${widget.alerta.lng}');
           }
         });
       }
     } catch (e) {
+      print('Error inicializando ubicaciones: $e');
       if (mounted) {
         setState(() {
-          _ubicacionPolicia = LatLng(-12.0464, -77.0428); // Lima por defecto
+          _ubicacionPolicia = LatLng(-12.0464, -77.0428);
           _ubicacionAlerta = LatLng(
             widget.alerta.lat ?? -12.0464,
             widget.alerta.lng ?? -77.0428,
           );
           _cargandoUbicacion = false;
         });
-
-        // Debug: Verificar coordenadas en caso de error
-        print('🔍 Coordenadas establecidas (fallback):');
-        print('  Alerta: ${widget.alerta.lat}, ${widget.alerta.lng}');
-        print(
-            '  _ubicacionAlerta: ${_ubicacionAlerta?.latitude}, ${_ubicacionAlerta?.longitude}');
-
-        // Centrar inmediatamente el mapa en el punto del incidente al cargar (fallback)
-        _centrarInicialmenteEnIncidente();
-
-        // **SOLUCIÓN PARA RE-ENTRADA: Centrado adicional para fallback**
-        Future.delayed(Duration(milliseconds: 800), () {
-          if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
-            final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
-            _mapController.move(puntoIncidente, 16.0);
-            print('🔄 Centrado post-fallback aplicado para re-entrada');
-          }
-        });
-
-        // **FIX PARA ESTADO "EN CAMINO": Retrasar generación de ruta en fallback**
-        int delayRuta = _estadoActual == 'en camino' ? 1500 : 300;
-        print('🗺️ Estado (fallback): $_estadoActual - Delay para ruta: ${delayRuta}ms');
-        
-        Future.delayed(Duration(milliseconds: delayRuta), () {
-          if (mounted) {
-            _generarRuta();
-          }
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No se pudo obtener la ubicación actual'),
-            backgroundColor: Colors.orange,
-          ),
-        );
       }
     }
   }
@@ -207,29 +197,49 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
   void _generarRuta() {
     if (_ubicacionPolicia == null || _ubicacionAlerta == null) return;
 
-    // Obtener ruta real por calles usando OpenRouteService
-    _obtenerRutaReal();
+    // Generar ruta en background sin bloquear la UI
+    _obtenerRutaReal().catchError((e) {
+      print('Error generando ruta: $e');
+      if (mounted) {
+        setState(() {
+          _cargandoRuta = false;
+        });
+      }
+    });
   }
 
   Future<void> _obtenerRutaReal() async {
-    if (_ubicacionPolicia == null || _ubicacionAlerta == null) return;
-    if (!mounted) return;
+    if (_ubicacionPolicia == null || _ubicacionAlerta == null || !mounted)
+      return;
 
     setState(() {
       _cargandoRuta = true;
     });
 
-    // Intentar primero con OSRM (más confiable y gratuito)
-    bool rutaObtenida = await _obtenerRutaOSRM();
+    try {
+      // Intentar primero con OSRM (más confiable y gratuito)
+      bool rutaObtenida = await _obtenerRutaOSRM();
 
-    if (!rutaObtenida && mounted) {
-      // Si OSRM falla, intentar con OpenRouteService
-      rutaObtenida = await _obtenerRutaOpenRouteService();
-    }
+      if (!rutaObtenida && mounted) {
+        // Si OSRM falla, intentar con OpenRouteService
+        rutaObtenida = await _obtenerRutaOpenRouteService();
+      }
 
-    if (!rutaObtenida && mounted) {
-      // Si ambos fallan, usar ruta directa
-      _usarRutaDirecta();
+      if (!rutaObtenida && mounted) {
+        // Si ambos fallan, usar ruta directa
+        _usarRutaDirecta();
+      }
+    } catch (e) {
+      print('Error obteniendo ruta: $e');
+      if (mounted) {
+        _usarRutaDirecta();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _cargandoRuta = false;
+        });
+      }
     }
   }
 
@@ -244,7 +254,7 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
           '?overview=full&geometries=geojson';
 
       final response =
-          await http.get(Uri.parse(url)).timeout(Duration(seconds: 10));
+          await http.get(Uri.parse(url)).timeout(Duration(seconds: 5));
 
       if (!mounted) return false;
 
@@ -271,14 +281,18 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
             // **IMPLEMENTACIÓN DEL REQUERIMIENTO: Centrado automático en incidente**
             // NO llamar a _ajustarVistaDelMapa() automáticamente aquí
             // para mantener el centro en el incidente, que es el comportamiento deseado
-            
+
             // **FIX ADICIONAL PARA "EN CAMINO": Re-centrar después de obtener ruta OSRM**
             if (_estadoActual == 'en camino') {
               Future.delayed(Duration(milliseconds: 500), () {
-                if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
-                  final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
+                if (mounted &&
+                    widget.alerta.lat != null &&
+                    widget.alerta.lng != null) {
+                  final puntoIncidente =
+                      LatLng(widget.alerta.lat!, widget.alerta.lng!);
                   _mapController.move(puntoIncidente, 16.0);
-                  print('🎯 Re-centrado post-ruta OSRM para estado "en camino"');
+                  print(
+                      '🎯 Re-centrado post-ruta OSRM para estado "en camino"');
                 }
               });
             }
@@ -394,7 +408,7 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     // **IMPLEMENTACIÓN DEL REQUERIMIENTO: Centrado automático en incidente**
     // NO llamar a _ajustarVistaDelMapa() automáticamente aquí
     // para mantener el centro en el incidente, que es el comportamiento deseado
-    
+
     // **FIX ADICIONAL PARA "EN CAMINO": Re-centrar después de ruta directa**
     if (_estadoActual == 'en camino') {
       Future.delayed(Duration(milliseconds: 500), () {
@@ -503,49 +517,6 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
     }
   }
 
-  // Función para centrar el mapa inicialmente en el punto del incidente sin mostrar mensaje
-  void _centrarInicialmenteEnIncidente() {
-    if (!mounted || _ubicacionAlerta == null) return;
-
-    // Verificar que tenemos coordenadas válidas
-    if (widget.alerta.lat == null || widget.alerta.lng == null) {
-      return; // No mostrar mensaje en el centrado inicial
-    }
-
-    try {
-      // Coordenadas exactas del incidente
-      final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
-
-      print(
-          '🎯 Centrando mapa inicialmente en incidente (sin mensaje): Lat: ${widget.alerta.lat}, Lng: ${widget.alerta.lng}');
-
-      // Centrado inmediato para asegurar que esté en el incidente desde el primer momento
-      _mapController.move(puntoIncidente, 16.0);
-
-      // Proceso de centrado secuencial mejorado para mayor precisión
-      Future.delayed(Duration(milliseconds: 200), () {
-        if (mounted) {
-          _mapController.move(puntoIncidente, 15.8);
-
-          Future.delayed(Duration(milliseconds: 300), () {
-            if (mounted) {
-              _mapController.move(puntoIncidente, 16.0);
-
-              // Centrado final para asegurar precisión máxima
-              Future.delayed(Duration(milliseconds: 400), () {
-                if (mounted) {
-                  _mapController.move(puntoIncidente, 16.0);
-                }
-              });
-            }
-          });
-        }
-      });
-    } catch (e) {
-      print('Error al centrar inicialmente en el incidente: $e');
-    }
-  }
-
   // Nueva función optimizada para centrar el mapa cuando está listo
   void _centrarMapaInicial() async {
     print('🗺️ Mapa listo - iniciando centrado optimizado en el incidente');
@@ -568,11 +539,11 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
 
       // Secuencia de recentrados más agresiva para re-entrada
       final secuenciaCentrado = [
-        {'delay': 50, 'zoom': 16.0},   // Muy rápido
-        {'delay': 150, 'zoom': 15.8},  // Ligero zoom out
-        {'delay': 300, 'zoom': 16.0},  // Zoom de vuelta
-        {'delay': 500, 'zoom': 16.0},  // Confirmación
-        {'delay': 800, 'zoom': 16.0},  // Asegurar
+        {'delay': 50, 'zoom': 16.0}, // Muy rápido
+        {'delay': 150, 'zoom': 15.8}, // Ligero zoom out
+        {'delay': 300, 'zoom': 16.0}, // Zoom de vuelta
+        {'delay': 500, 'zoom': 16.0}, // Confirmación
+        {'delay': 800, 'zoom': 16.0}, // Asegurar
         {'delay': 1200, 'zoom': 16.0}, // Final
       ];
 
@@ -580,13 +551,14 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
         Future.delayed(Duration(milliseconds: config['delay'] as int), () {
           if (mounted) {
             _mapController.move(puntoIncidente, config['zoom'] as double);
-            print('🔄 Recentrado en incidente - delay ${config['delay']}ms, zoom ${config['zoom']}');
+            print(
+                '🔄 Recentrado en incidente - delay ${config['delay']}ms, zoom ${config['zoom']}');
           }
         });
       }
 
       // Mostrar mensaje de confirmación específico según el estado
-      String mensaje = _estadoActual == 'en camino' 
+      String mensaje = _estadoActual == 'en camino'
           ? '🎯 Regresando al incidente - Mapa centrado automáticamente'
           : '🎯 Mapa centrado automáticamente en el incidente';
 
@@ -606,14 +578,17 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                   ),
                 ],
               ),
-              backgroundColor: _estadoActual == 'en camino' ? Colors.green[600] : Colors.blue[600],
+              backgroundColor: _estadoActual == 'en camino'
+                  ? Colors.green[600]
+                  : Colors.blue[600],
               duration: Duration(seconds: 2),
             ),
           );
         }
       });
 
-      print('✅ Secuencia de centrado automático en incidente iniciada (estado: $_estadoActual)');
+      print(
+          '✅ Secuencia de centrado automático en incidente iniciada (estado: $_estadoActual)');
     } catch (e) {
       print('❌ Error en centrado automático inicial: $e');
     }
@@ -755,6 +730,9 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
         destinoLat: _ubicacionAlerta?.latitude,
         destinoLng: _ubicacionAlerta?.longitude,
         evidenciaUrl: evidenciaUrl,
+        detallesAtencion: nuevoEstado == 'atendida'
+            ? _detallesAtencionController.text.trim()
+            : null,
       );
 
       if (!mounted) return;
@@ -1208,15 +1186,13 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Chip(
-                                            label: Text(
-                                              _estadoActual.toUpperCase(),
-                                            ),
-                                            backgroundColor: _getColorEstado(
-                                              _estadoActual,
-                                            ),
-                                            labelStyle: TextStyle(
-                                              color: Colors.white,
+                                          Text(
+                                            _estadoActual.toUpperCase(),
+                                            style: TextStyle(
+                                              color: _getColorEstado(
+                                                  _estadoActual),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                           Column(
@@ -1255,25 +1231,34 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                         mapController: _mapController,
                                         options: MapOptions(
                                           center: LatLng(
-                                          widget.alerta.lat ?? -12.0464,
-                                          widget.alerta.lng ?? -77.0428),
+                                              widget.alerta.lat ?? -12.0464,
+                                              widget.alerta.lng ?? -77.0428),
                                           zoom:
-                                          16, // Zoom inicial centrado en el incidente desde el primer momento
+                                              16, // Zoom inicial centrado en el incidente desde el primer momento
                                           onMapReady: () {
-                                          // Centrar inmediatamente cuando el mapa esté listo
-                            _centrarMapaInicial();
-                            print('📍 Mapa listo - aplicando centrado automático en incidente');
-                            
-                            // **SOLUCIÓN ADICIONAL PARA RE-ENTRADA**
-                            // Centrado final después de que todo esté completamente listo
-                            Future.delayed(Duration(milliseconds: 2000), () {
-                              if (mounted && widget.alerta.lat != null && widget.alerta.lng != null) {
-                                final puntoIncidente = LatLng(widget.alerta.lat!, widget.alerta.lng!);
-                                _mapController.move(puntoIncidente, 16.0);
-                                print('🎆 Centrado final de seguridad aplicado para re-entrada');
-                              }
-                            });
-                          },
+                                            // Centrar inmediatamente cuando el mapa esté listo
+                                            _centrarMapaInicial();
+                                            print(
+                                                '📍 Mapa listo - aplicando centrado automático en incidente');
+
+                                            // **SOLUCIÓN ADICIONAL PARA RE-ENTRADA**
+                                            // Centrado final después de que todo esté completamente listo
+                                            Future.delayed(
+                                                Duration(milliseconds: 2000),
+                                                () {
+                                              if (mounted &&
+                                                  widget.alerta.lat != null &&
+                                                  widget.alerta.lng != null) {
+                                                final puntoIncidente = LatLng(
+                                                    widget.alerta.lat!,
+                                                    widget.alerta.lng!);
+                                                _mapController.move(
+                                                    puntoIncidente, 16.0);
+                                                print(
+                                                    '🎆 Centrado final de seguridad aplicado para re-entrada');
+                                              }
+                                            });
+                                          },
                                           // Configuración para mantener el centrado en el incidente
                                           keepAlive: true,
                                           // Permitir interacción pero mantener foco en el incidente
@@ -1483,17 +1468,26 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                                 if (mounted) {
                                                   _centrarEnIncidente();
                                                   // Mostrar mensaje de confirmación mejorado
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
                                                     SnackBar(
                                                       content: Row(
                                                         children: [
-                                                          Icon(Icons.center_focus_strong, color: Colors.white, size: 16),
+                                                          Icon(
+                                                              Icons
+                                                                  .center_focus_strong,
+                                                              color:
+                                                                  Colors.white,
+                                                              size: 16),
                                                           SizedBox(width: 8),
-                                                          Text('🎯 Centrando manualmente en el incidente'),
+                                                          Text(
+                                                              '🎯 Centrando manualmente en el incidente'),
                                                         ],
                                                       ),
-                                                      backgroundColor: Colors.orange[600],
-                                                      duration: Duration(seconds: 2),
+                                                      backgroundColor:
+                                                          Colors.orange[600],
+                                                      duration:
+                                                          Duration(seconds: 2),
                                                     ),
                                                   );
                                                 }
@@ -1504,7 +1498,8 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
                                         ),
                                         label: Text('Centrar'),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.orange[600], // Color más visible
+                                          backgroundColor: Colors
+                                              .orange[600], // Color más visible
                                           foregroundColor: Colors.white,
                                           padding: EdgeInsets.symmetric(
                                             horizontal: 4,
@@ -1605,7 +1600,7 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
       },
       {
         'estado': 'en camino',
-        'texto': 'Ir al Lugar',
+        'texto': 'Ir al Lugar y Atender Alerta',
         'color': Colors.blue,
         'icon': Icons.directions_car,
       },
@@ -1681,6 +1676,92 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
         // Si está en camino y va a completar, mostrar opción de evidencia
         if (_estadoActual == 'en camino' &&
             siguienteEstado['estado'] == 'atendida') ...[
+          // Sección de detalles de atención (obligatorio)
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(12),
+            margin: EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange[300]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.edit_note, color: Colors.orange[700], size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Detalles de Atención (Obligatorio)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange[700],
+                      ),
+                    ),
+                    Text(
+                      ' *',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: _detallesAtencionController,
+                  maxLength: 500,
+                  maxLines: 4,
+                  onChanged: (value) {
+                    setState(() {
+                      _detallesValidos = value.trim().length >= 10;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText:
+                        'Describa los detalles de la atención realizada, acciones tomadas, estado del incidente, etc.',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.orange[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          BorderSide(color: Colors.orange[600]!, width: 2),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.red, width: 2),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.red, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    errorText: _detallesAtencionController.text.isNotEmpty &&
+                            !_detallesValidos
+                        ? 'Mínimo 10 caracteres requeridos'
+                        : null,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Mínimo 10 caracteres, máximo 500. Incluya información relevante sobre la situación atendida.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Sección de evidencia (opcional)
           Container(
             width: double.infinity,
@@ -1811,8 +1892,23 @@ class _RutaAtencionScreenState extends State<RutaAtencionScreen> {
             onPressed: _actualizandoEstado || !mounted
                 ? null
                 : () {
+                    // Validar detalles de atención si es necesario
+                    if (siguienteEstado!['estado'] == 'atendida' &&
+                        !_detallesValidos) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '📝 Debe completar los detalles de atención antes de finalizar (mínimo 10 caracteres)',
+                          ),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                      return;
+                    }
+
                     if (mounted)
-                      _actualizarEstadoAlerta(siguienteEstado!['estado']);
+                      _actualizarEstadoAlerta(siguienteEstado['estado']);
                   },
             icon: _actualizandoEstado
                 ? SizedBox(

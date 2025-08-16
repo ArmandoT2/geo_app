@@ -45,6 +45,11 @@ class _GestionUsuariosScreenState extends State<GestionUsuariosScreen> {
     await _cargarUsuarios(); // Recargar al volver
   }
 
+  Future<void> _irCambiarContrasena(User usuario) async {
+    await Navigator.pushNamed(context, '/cambiar-contrasena-admin',
+        arguments: usuario);
+  }
+
   Future<void> _eliminarUsuario(User usuario) async {
     // Mostrar diálogo de confirmación
     final bool? confirmar = await showDialog<bool>(
@@ -153,72 +158,78 @@ class _GestionUsuariosScreenState extends State<GestionUsuariosScreen> {
       body: _loading
           ? Center(child: CircularProgressIndicator())
           : _usuarios.isEmpty
-          ? Center(child: Text('No hay usuarios registrados'))
-          : ListView.builder(
-              itemCount: _usuarios.length,
-              itemBuilder: (context, index) {
-                final u = _usuarios[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: _getRolColor(u.rol),
-                      child: Icon(
-                        _getRolIcon(u.rol),
-                        color: Colors.white,
-                        size: 20,
+              ? Center(child: Text('No hay usuarios registrados'))
+              : ListView.builder(
+                  itemCount: _usuarios.length,
+                  itemBuilder: (context, index) {
+                    final u = _usuarios[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: _getRolColor(u.rol),
+                          child: Icon(
+                            _getRolIcon(u.rol),
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(u.fullName),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(u.email),
+                            SizedBox(height: 4),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getRolColor(u.rol).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _getRolColor(u.rol).withOpacity(0.5),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                _getRolDisplayName(u.rol),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _getRolColor(u.rol).withOpacity(0.8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _irEditarUsuario(u),
+                              tooltip: 'Editar usuario',
+                            ),
+                            IconButton(
+                              icon:
+                                  Icon(Icons.lock_reset, color: Colors.orange),
+                              onPressed: () => _irCambiarContrasena(u),
+                              tooltip: 'Cambiar contraseña',
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _eliminarUsuario(u),
+                              tooltip: 'Eliminar usuario',
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    title: Text(u.fullName),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(u.email),
-                        SizedBox(height: 4),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getRolColor(u.rol).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _getRolColor(u.rol).withOpacity(0.5),
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            _getRolDisplayName(u.rol),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: _getRolColor(u.rol).withOpacity(0.8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    isThreeLine: true,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.edit, color: Colors.blue),
-                          onPressed: () => _irEditarUsuario(u),
-                          tooltip: 'Editar usuario',
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _eliminarUsuario(u),
-                          tooltip: 'Eliminar usuario',
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
     );
   }
 }

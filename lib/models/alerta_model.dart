@@ -13,10 +13,10 @@ class RutaAtencion {
 
   factory RutaAtencion.fromJson(Map<String, dynamic> json) {
     return RutaAtencion(
-      origenLat: json['origen']['lat']?.toDouble() ?? 0.0,
-      origenLng: json['origen']['lng']?.toDouble() ?? 0.0,
-      destinoLat: json['destino']['lat']?.toDouble() ?? 0.0,
-      destinoLng: json['destino']['lng']?.toDouble() ?? 0.0,
+      origenLat: json['origen']?['lat']?.toDouble() ?? 0.0,
+      origenLng: json['origen']?['lng']?.toDouble() ?? 0.0,
+      destinoLat: json['destino']?['lat']?.toDouble() ?? 0.0,
+      destinoLng: json['destino']?['lng']?.toDouble() ?? 0.0,
     );
   }
 }
@@ -30,7 +30,8 @@ class Alerta {
   final String detalle;
   final String status;
   final String? atendidoPor;
-  final List<dynamic>? evidencia;
+  final String? detallesAtencion; // Detalles de atención del gendarme
+  final List<String>? evidencia;
   final RutaAtencion? rutaAtencion;
   final double? lat;
   final double? lng;
@@ -53,6 +54,7 @@ class Alerta {
     required this.detalle,
     required this.status,
     this.atendidoPor,
+    this.detallesAtencion,
     this.evidencia,
     this.rutaAtencion,
     this.lat,
@@ -67,39 +69,48 @@ class Alerta {
   });
 
   factory Alerta.fromJson(Map<String, dynamic> json) {
-    return Alerta(
-      id: json['_id'] ?? '',
-      direccion: json['direccion'] ?? '',
-      usuarioCreador: json['usuarioCreador'] ?? '',
-      nombreUsuario: json['nombreUsuario'],
-      fechaHora: DateTime.parse(json['fechaHora']),
-      detalle: json['detalle'] ?? '',
-      status: json['status'] ?? '',
-      atendidoPor: json['atendidoPor'],
-      evidencia:
-          json['evidencia'] != null
-              ? List<dynamic>.from(json['evidencia'])
-              : null,
-      rutaAtencion:
-          json['rutaAtencion'] != null
-              ? RutaAtencion.fromJson(json['rutaAtencion'])
-              : null,
-      lat:
-          json['ubicacion']?['lat']?.toDouble() ??
-          json['lat']?.toDouble() ??
-          json['latitude']?.toDouble(),
-      lng:
-          json['ubicacion']?['lng']?.toDouble() ??
-          json['lng']?.toDouble() ??
-          json['longitude']?.toDouble(),
-      visible: json['visible'] ?? true, // Campo de visibilidad
-      calle: json['calle'],
-      barrio: json['barrio'],
-      ciudad: json['ciudad'],
-      estado: json['estado'],
-      pais: json['pais'],
-      codigoPostal: json['codigoPostal'],
-    );
+    try {
+      return Alerta(
+        id: json['_id'] ?? '',
+        direccion: json['direccion'] ?? '',
+        usuarioCreador: json['usuarioCreador'] is String
+            ? json['usuarioCreador']
+            : json['usuarioCreador']?['_id'] ?? '',
+        nombreUsuario:
+            json['nombreUsuario'] ?? json['usuarioCreador']?['fullName'],
+        fechaHora: DateTime.parse(json['fechaHora']),
+        detalle: json['detalle'] ?? '',
+        status: json['status'] ?? '',
+        atendidoPor: json['atendidoPor'] is String
+            ? json['atendidoPor']
+            : json['atendidoPor']?['_id'],
+        detallesAtencion: json['detallesAtencion'],
+        evidencia: json['evidencia'] != null
+            ? List<String>.from(
+                json['evidencia'].map((item) => item.toString()))
+            : null,
+        rutaAtencion: json['rutaAtencion'] != null
+            ? RutaAtencion.fromJson(json['rutaAtencion'])
+            : null,
+        lat: json['ubicacion']?['lat']?.toDouble() ??
+            json['lat']?.toDouble() ??
+            json['latitude']?.toDouble(),
+        lng: json['ubicacion']?['lng']?.toDouble() ??
+            json['lng']?.toDouble() ??
+            json['longitude']?.toDouble(),
+        visible: json['visible'] ?? true,
+        calle: json['calle'],
+        barrio: json['barrio'],
+        ciudad: json['ciudad'],
+        estado: json['estado'],
+        pais: json['pais'],
+        codigoPostal: json['codigoPostal'],
+      );
+    } catch (e) {
+      print('❌ Error parseando Alerta desde JSON: $e');
+      print('❌ JSON problemático: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -118,19 +129,18 @@ class Alerta {
       'estado': estado,
       'pais': pais,
       'codigoPostal': codigoPostal,
-      'rutaAtencion':
-          rutaAtencion != null
-              ? {
-                'origen': {
-                  'lat': rutaAtencion!.origenLat,
-                  'lng': rutaAtencion!.origenLng,
-                },
-                'destino': {
-                  'lat': rutaAtencion!.destinoLat,
-                  'lng': rutaAtencion!.destinoLng,
-                },
-              }
-              : null,
+      'rutaAtencion': rutaAtencion != null
+          ? {
+              'origen': {
+                'lat': rutaAtencion!.origenLat,
+                'lng': rutaAtencion!.origenLng,
+              },
+              'destino': {
+                'lat': rutaAtencion!.destinoLat,
+                'lng': rutaAtencion!.destinoLng,
+              },
+            }
+          : null,
       'ubicacion': {'lat': lat, 'lng': lng},
     };
   }
