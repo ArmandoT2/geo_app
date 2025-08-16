@@ -114,107 +114,135 @@ class _AlertasAtendidasScreenState extends State<AlertasAtendidasScreen> {
         onTap: () => _mostrarDetalleAlerta(alerta),
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Encabezado con estado y fecha
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _getColorByStatus(alerta.status),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      alerta.status.toUpperCase(),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    _formatearFecha(alerta.fechaHora),
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 12),
-
-              // Detalle de la alerta
-              Text(
-                alerta.detalle,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: 8),
-
-              // Dirección
-              Row(
-                children: [
-                  Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                  SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      alerta.direccionCompleta,
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-
-              // Usuario creador
-              Row(
-                children: [
-                  Icon(Icons.person, size: 16, color: Colors.grey[600]),
-                  SizedBox(width: 4),
-                  Text(
-                    'Reportado por: $nombreUsuario',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Indicador de detalles de atención si existen
-              if (alerta.detallesAtencion != null &&
-                  alerta.detallesAtencion!.isNotEmpty) ...[
-                SizedBox(height: 8),
+          child: IntrinsicHeight(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Encabezado con estado y fecha
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.note_alt, size: 16, color: Colors.blue[600]),
-                    SizedBox(width: 4),
-                    Text(
-                      'Detalles de atención disponibles',
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
+                    Flexible(
+                      flex: 2,
+                      child: Container(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getColorByStatus(alerta.status),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          alerta.status.toUpperCase(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Flexible(
+                      flex: 3,
+                      child: Text(
+                        _formatearFecha(alerta.fechaHora),
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.end,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
+                SizedBox(height: 12),
+
+                // Detalle de la alerta
+                Container(
+                  width: double.infinity,
+                  child: Text(
+                    alerta.detalle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(height: 8),
+
+                // Dirección
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                    SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        alerta.direccionCompleta,
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+
+                // Usuario creador
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                    SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Reportado por: $nombreUsuario',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Indicador de detalles de atención si existen
+                if (alerta.detallesAtencion != null &&
+                    alerta.detallesAtencion!.isNotEmpty) ...[
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.note_alt, size: 16, color: Colors.blue[600]),
+                      SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Detalles de atención disponibles',
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -230,54 +258,63 @@ class _AlertasAtendidasScreenState extends State<AlertasAtendidasScreen> {
             'Detalle de Alerta Atendida',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildDetailRow('Estado:', alerta.status.toUpperCase()),
-                _buildDetailRow('Fecha:', _formatearFecha(alerta.fechaHora)),
-                _buildDetailRow('Detalle:', alerta.detalle),
-                _buildDetailRow('Dirección:', alerta.direccionCompleta),
-                _buildDetailRow('Reportado por:',
-                    _nombresUsuarios[alerta.usuarioCreador] ?? 'Desconocido'),
-                if (alerta.detallesAtencion != null &&
-                    alerta.detallesAtencion!.isNotEmpty) ...[
-                  SizedBox(height: 16),
-                  Text(
-                    'Detalles de Atención:',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.blue[700]),
-                  ),
-                  SizedBox(height: 8),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue[200]!),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+              maxWidth: MediaQuery.of(context).size.width * 0.9,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildDetailRow('Estado:', alerta.status.toUpperCase()),
+                  _buildDetailRow('Fecha:', _formatearFecha(alerta.fechaHora)),
+                  _buildDetailRow('Detalle:', alerta.detalle),
+                  _buildDetailRow('Dirección:', alerta.direccionCompleta),
+                  _buildDetailRow('Reportado por:',
+                      _nombresUsuarios[alerta.usuarioCreador] ?? 'Desconocido'),
+                  if (alerta.detallesAtencion != null &&
+                      alerta.detallesAtencion!.isNotEmpty) ...[
+                    SizedBox(height: 16),
+                    Text(
+                      'Detalles de Atención:',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.blue[700]),
                     ),
-                    child: Text(
-                      alerta.detallesAtencion!,
-                      style: TextStyle(fontSize: 14),
+                    SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue[200]!),
+                      ),
+                      child: Text(
+                        alerta.detallesAtencion!,
+                        style: TextStyle(fontSize: 14),
+                        softWrap: true,
+                      ),
                     ),
-                  ),
+                  ],
+                  if (alerta.evidencia != null &&
+                      alerta.evidencia!.isNotEmpty) ...[
+                    SizedBox(height: 16),
+                    Text(
+                      'Evidencia:',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700]),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '${alerta.evidencia!.length} archivo(s) de evidencia',
+                      style: TextStyle(color: Colors.green[600]),
+                    ),
+                  ],
                 ],
-                if (alerta.evidencia != null &&
-                    alerta.evidencia!.isNotEmpty) ...[
-                  SizedBox(height: 16),
-                  Text(
-                    'Evidencia:',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.green[700]),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '${alerta.evidencia!.length} archivo(s) de evidencia',
-                    style: TextStyle(color: Colors.green[600]),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
           actions: [
@@ -302,9 +339,13 @@ class _AlertasAtendidasScreenState extends State<AlertasAtendidasScreen> {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+          Container(
+            width: double.infinity,
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              softWrap: true,
+            ),
           ),
         ],
       ),
@@ -414,11 +455,20 @@ class _AlertasAtendidasScreenState extends State<AlertasAtendidasScreen> {
                 _cargarAlertasAtendidas();
               });
             },
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              itemCount: alertas.length,
-              itemBuilder: (context, index) {
-                return _buildAlertaCard(alertas[index]);
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ListView.builder(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  itemCount: alertas.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth,
+                      ),
+                      child: _buildAlertaCard(alertas[index]),
+                    );
+                  },
+                );
               },
             ),
           );
