@@ -8,50 +8,46 @@ import '../models/alerta_model.dart';
 class AlertaService {
   Future<List<Alerta>> obtenerAlertasPorUsuario(String userId) async {
     try {
+      print('🚀 OBTENER ALERTAS - UserId: $userId');
+
       final response = await http.get(
         Uri.parse('${AppConfig.alertasUrl}/usuario/$userId'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: AppConfig.connectionTimeout));
 
-      print('🔍 OBTENIENDO ALERTAS PARA USUARIO: $userId');
-      print('📤 Respuesta status: ${response.statusCode}');
+      print('� Respuesta status: ${response.statusCode}');
+      print('📤 Respuesta headers: ${response.headers}');
       print('📤 Respuesta body: ${response.body}');
 
       if (response.statusCode == 200) {
         final List<dynamic> body = json.decode(response.body);
         print('📊 Datos recibidos: ${body.length} elementos');
+        print('📊 Datos raw: $body');
 
         List<Alerta> alertasValidas = [];
         for (int i = 0; i < body.length; i++) {
           try {
             final alerta = Alerta.fromJson(body[i]);
             alertasValidas.add(alerta);
-            print('✅ Alerta ${i + 1} parseada: ${alerta.id}');
+            print(
+                '✅ Alerta ${i + 1} parseada: ${alerta.id} - ${alerta.detalle}');
           } catch (e) {
             print('❌ Error parseando alerta ${i + 1}: $e');
             print('❌ Datos problemáticos: ${body[i]}');
           }
         }
 
-        // Retornar todas las alertas válidas del usuario
-        // El filtrado por visibilidad se maneja en el backend según el contexto
-        print('🎯 RESULTADO: ${alertasValidas.length} alertas del usuario');
         return alertasValidas;
       } else {
         throw Exception('Error al obtener alertas: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error en obtenerAlertasPorUsuario: $e');
-      throw Exception('Error de conexión al obtener alertas');
+      throw Exception('Error de conexión al obtener alertas: $e');
     }
   }
 
   Future<Alerta?> crearAlerta(Alerta alerta) async {
     try {
-      print('=== ENVIANDO ALERTA ===');
-      print('URL: ${AppConfig.crearAlertaUrl}');
-      print('Datos a enviar: ${jsonEncode(alerta.toJson())}');
-
       final response = await http
           .post(
             Uri.parse(AppConfig.crearAlertaUrl),
@@ -60,26 +56,61 @@ class AlertaService {
           )
           .timeout(Duration(seconds: AppConfig.connectionTimeout));
 
-      print('=== RESPUESTA DEL BACKEND ===');
-      print('Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
-
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('✅ Alerta creada exitosamente');
-        final responseData = json.decode(response.body);
-        if (responseData['alerta'] != null) {
-          return Alerta.fromJson(responseData['alerta']);
-        } else {
-          print('⚠️ Respuesta no contiene la alerta creada');
-          return null;
+        try {
+          final responseData = json.decode(response.body);
+
+          if (responseData['alerta'] != null) {
+            final alertaCreada = Alerta.fromJson(responseData['alerta']);
+            return alertaCreada;
+          } else {
+            // Si el status es exitoso, crear una alerta para activar el flujo
+            return Alerta(
+              id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+              direccion: alerta.direccion,
+              usuarioCreador: alerta.usuarioCreador,
+              fechaHora: alerta.fechaHora,
+              detalle: alerta.detalle,
+              status: 'pendiente',
+              lat: alerta.lat,
+              lng: alerta.lng,
+              calle: alerta.calle,
+              barrio: alerta.barrio,
+              ciudad: alerta.ciudad,
+              estado: alerta.estado,
+              pais: alerta.pais,
+              codigoPostal: alerta.codigoPostal,
+            );
+          }
+        } catch (parseError) {
+          print('❌ Error parseando respuesta JSON: $parseError');
+          print('❌ Respuesta raw: ${response.body}');
+
+          // Si hay error parseando PERO el status es exitoso,
+          // crear alerta temporal para activar el flujo
+          print(
+              '✅ Status exitoso - creando alerta temporal a pesar del error de parsing');
+          return Alerta(
+            id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+            direccion: alerta.direccion,
+            usuarioCreador: alerta.usuarioCreador,
+            fechaHora: alerta.fechaHora,
+            detalle: alerta.detalle,
+            status: 'pendiente',
+            lat: alerta.lat,
+            lng: alerta.lng,
+            calle: alerta.calle,
+            barrio: alerta.barrio,
+            ciudad: alerta.ciudad,
+            estado: alerta.estado,
+            pais: alerta.pais,
+            codigoPostal: alerta.codigoPostal,
+          );
         }
       } else {
-        print(
-            '❌ Error al crear alerta: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      print('❌ Error en crearAlerta: $e');
       return null;
     }
   }
@@ -95,29 +126,16 @@ class AlertaService {
       if (response.statusCode == 200) {
         final List<dynamic> body = jsonDecode(response.body);
 
-        // Debug: Imprimir datos recibidos del backend
-        print('=== DEBUG BACKEND RESPONSE ===');
-        print('Status Code: ${response.statusCode}');
-        print('Response Body: ${response.body}');
-        print('Parsed Body Count: ${body.length}');
-
-        if (body.isNotEmpty) {
-          print('Primer elemento de ejemplo:');
-          print(body.first);
-        }
-
         List<Alerta> alertasValidas = [];
         for (int i = 0; i < body.length; i++) {
           try {
             final alerta = Alerta.fromJson(body[i]);
             alertasValidas.add(alerta);
           } catch (e) {
-            print('❌ Error parseando alerta pendiente ${i + 1}: $e');
+            print('Error parseando alerta pendiente: $e');
           }
         }
 
-        print(
-            '✅ Alertas pendientes parseadas: ${alertasValidas.length} de ${body.length}');
         return alertasValidas;
       } else {
         throw Exception(
@@ -125,7 +143,6 @@ class AlertaService {
         );
       }
     } catch (e) {
-      print('Error en obtenerAlertasPendientes: $e');
       throw Exception('Error de conexión al obtener alertas pendientes');
     }
   }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/alerta_model.dart';
 import '../services/alerta_service.dart';
 import 'alerta_form_screen.dart';
-import 'alerta_tracking_screen.dart';
 
 class AlertaListScreen extends StatefulWidget {
   final String userId;
@@ -189,6 +188,8 @@ class _AlertaListScreenState extends State<AlertaListScreen> {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
+                          // Temporalmente deshabilitado para testing
+                          /*
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -196,6 +197,7 @@ class _AlertaListScreenState extends State<AlertaListScreen> {
                                   AlertaTrackingScreen(alerta: alerta),
                             ),
                           );
+                          */
                         },
                         child: Padding(
                           padding: EdgeInsets.all(16),
@@ -302,6 +304,8 @@ class _AlertaListScreenState extends State<AlertaListScreen> {
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   onPressed: () {
+                                    // Temporalmente deshabilitado para testing
+                                    /*
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -309,6 +313,7 @@ class _AlertaListScreenState extends State<AlertaListScreen> {
                                             alerta: alerta),
                                       ),
                                     );
+                                    */
                                   },
                                   icon: Icon(Icons.track_changes),
                                   label: Text('Ver Seguimiento'),

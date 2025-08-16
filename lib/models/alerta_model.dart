@@ -70,47 +70,113 @@ class Alerta {
 
   factory Alerta.fromJson(Map<String, dynamic> json) {
     try {
+      // Verificar básicos
+      String id = json['_id']?.toString() ?? '';
+      String direccion = json['direccion']?.toString() ?? '';
+
+      // usuarioCreador - verificar si es objeto o string
+      String usuarioCreador;
+      if (json['usuarioCreador'] is String) {
+        usuarioCreador = json['usuarioCreador'];
+      } else if (json['usuarioCreador'] is Map) {
+        usuarioCreador = json['usuarioCreador']['_id']?.toString() ?? '';
+      } else {
+        usuarioCreador = '';
+      }
+
+      DateTime fechaHora = DateTime.parse(json['fechaHora'].toString());
+      String detalle = json['detalle']?.toString() ?? '';
+
+      String status = json['status']?.toString() ?? '';
+
+      // evidencia
+      List<String>? evidencia;
+      try {
+        if (json['evidencia'] != null) {
+          if (json['evidencia'] is List) {
+            evidencia = (json['evidencia'] as List)
+                .map((item) => item.toString())
+                .toList();
+          } else {
+            evidencia = [];
+          }
+        }
+      } catch (e) {
+        evidencia = [];
+      }
+
+      // rutaAtencion
+      RutaAtencion? rutaAtencion;
+      try {
+        if (json['rutaAtencion'] != null && json['rutaAtencion'] is Map) {
+          rutaAtencion = RutaAtencion.fromJson(json['rutaAtencion']);
+        }
+      } catch (e) {
+        rutaAtencion = null;
+      }
+
+      // ubicacion
+      double? lat, lng;
+      try {
+        if (json['ubicacion'] != null && json['ubicacion'] is Map) {
+          lat = _parseDouble(json['ubicacion']['lat']);
+          lng = _parseDouble(json['ubicacion']['lng']);
+        }
+      } catch (e) {
+        lat = null;
+        lng = null;
+      }
+
+      // atendidoPor
+      String? atendidoPor;
+      try {
+        if (json['atendidoPor'] != null) {
+          if (json['atendidoPor'] is String) {
+            atendidoPor = json['atendidoPor'];
+          } else if (json['atendidoPor'] is Map) {
+            atendidoPor = json['atendidoPor']['_id']?.toString();
+          }
+        }
+      } catch (e) {
+        atendidoPor = null;
+      }
+
       return Alerta(
-        id: json['_id'] ?? '',
-        direccion: json['direccion'] ?? '',
-        usuarioCreador: json['usuarioCreador'] is String
-            ? json['usuarioCreador']
-            : json['usuarioCreador']?['_id'] ?? '',
-        nombreUsuario:
-            json['nombreUsuario'] ?? json['usuarioCreador']?['fullName'],
-        fechaHora: DateTime.parse(json['fechaHora']),
-        detalle: json['detalle'] ?? '',
-        status: json['status'] ?? '',
-        atendidoPor: json['atendidoPor'] is String
-            ? json['atendidoPor']
-            : json['atendidoPor']?['_id'],
-        detallesAtencion: json['detallesAtencion'],
-        evidencia: json['evidencia'] != null
-            ? List<String>.from(
-                json['evidencia'].map((item) => item.toString()))
-            : null,
-        rutaAtencion: json['rutaAtencion'] != null
-            ? RutaAtencion.fromJson(json['rutaAtencion'])
-            : null,
-        lat: json['ubicacion']?['lat']?.toDouble() ??
-            json['lat']?.toDouble() ??
-            json['latitude']?.toDouble(),
-        lng: json['ubicacion']?['lng']?.toDouble() ??
-            json['lng']?.toDouble() ??
-            json['longitude']?.toDouble(),
+        id: id,
+        direccion: direccion,
+        usuarioCreador: usuarioCreador,
+        nombreUsuario: json['nombreUsuario']?.toString(),
+        fechaHora: fechaHora,
+        detalle: detalle,
+        status: status,
+        atendidoPor: atendidoPor,
+        detallesAtencion: json['detallesAtencion']?.toString(),
+        evidencia: evidencia,
+        rutaAtencion: rutaAtencion,
+        lat: lat,
+        lng: lng,
         visible: json['visible'] ?? true,
-        calle: json['calle'],
-        barrio: json['barrio'],
-        ciudad: json['ciudad'],
-        estado: json['estado'],
-        pais: json['pais'],
-        codigoPostal: json['codigoPostal'],
+        calle: json['calle']?.toString(),
+        barrio: json['barrio']?.toString(),
+        ciudad: json['ciudad']?.toString(),
+        estado: json['estado']?.toString(),
+        pais: json['pais']?.toString(),
+        codigoPostal: json['codigoPostal']?.toString(),
       );
     } catch (e) {
-      print('❌ Error parseando Alerta desde JSON: $e');
-      print('❌ JSON problemático: $json');
+      print('Error parseando Alerta desde JSON: $e');
       rethrow;
     }
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value);
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {

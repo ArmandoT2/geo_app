@@ -80,6 +80,8 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
   }
 
   Future<void> _actualizarDireccion(LatLng position) async {
+    if (!mounted) return;
+
     setState(() {
       _selectedPosition = position;
       _direccionActual = 'Obteniendo dirección...';
@@ -148,6 +150,7 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
       return;
     }
 
+    if (!mounted) return;
     setState(() {
       _enviandoAlerta = true;
     });
@@ -181,14 +184,16 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
       print('Respuesta del servicio: $alertaCreada');
 
       if (alertaCreada != null) {
-        setState(() {
-          _alertaCreada = alertaCreada;
-          _mostrarCancelacion = true;
-          _enviandoAlerta = false;
-        });
+        if (mounted) {
+          setState(() {
+            _alertaCreada = alertaCreada;
+            _mostrarCancelacion = true;
+            _enviandoAlerta = false;
+          });
 
-        // Iniciar el timer de cancelación
-        _iniciarTimerCancelacion();
+          // Iniciar el timer de cancelación
+          _iniciarTimerCancelacion();
+        }
 
         // Mostrar mensaje de éxito con opción de cancelación
         if (mounted) {
@@ -762,14 +767,13 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
           ),
 
           Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(20),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Timer de cancelación
                   Container(
-                    padding: EdgeInsets.all(24),
+                    padding: EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -787,38 +791,38 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
                         Icon(
                           Icons.timer,
                           color: Colors.orange[700],
-                          size: 48,
+                          size: 40,
                         ),
-                        SizedBox(height: 16),
+                        SizedBox(height: 12),
                         Text(
                           'Opción de Cancelación',
                           style: TextStyle(
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey[800],
                           ),
                         ),
-                        SizedBox(height: 8),
+                        SizedBox(height: 6),
                         Text(
                           'Puedes cancelar esta alerta si fue enviada por error o ya no requieres asistencia',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             color: Colors.grey[600],
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        SizedBox(height: 24),
+                        SizedBox(height: 16),
 
                         // Contador circular
                         Stack(
                           alignment: Alignment.center,
                           children: [
                             SizedBox(
-                              width: 120,
-                              height: 120,
+                              width: 100,
+                              height: 100,
                               child: CircularProgressIndicator(
                                 value: _segundosRestantes / 30,
-                                strokeWidth: 8,
+                                strokeWidth: 6,
                                 backgroundColor: Colors.grey[300],
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   _segundosRestantes > 10
@@ -832,7 +836,7 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
                                 Text(
                                   '$_segundosRestantes',
                                   style: TextStyle(
-                                    fontSize: 32,
+                                    fontSize: 28,
                                     fontWeight: FontWeight.bold,
                                     color: _segundosRestantes > 10
                                         ? Colors.orange[700]
@@ -842,7 +846,7 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
                                 Text(
                                   'segundos',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     color: Colors.grey[600],
                                   ),
                                 ),
@@ -903,62 +907,6 @@ class _AlertaFormScreenState extends State<AlertaFormScreen> {
                                   ),
                                 ],
                               ),
-                              // Widget de debug (solo en desarrollo)
-                              if (_alertaCreada != null) ...[
-                                SizedBox(height: 8),
-                                Container(
-                                  padding: EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green[100],
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'DEBUG INFO:',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green[800],
-                                        ),
-                                      ),
-                                      Text(
-                                        'ID: ${_alertaCreada!.id}',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.green[700],
-                                        ),
-                                      ),
-                                      Text(
-                                        'Estado: ${_alertaCreada!.status}',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.green[700],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ] else ...[
-                                SizedBox(height: 8),
-                                Container(
-                                  padding: EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red[100],
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'DEBUG: _alertaCreada es NULL',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red[800],
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                         ),
